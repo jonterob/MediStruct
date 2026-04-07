@@ -1,93 +1,154 @@
-# 🏥 Kerugoya Hospital System (MediStruct)
+# MediStruct (Kerugoya Hospital Management System)
 
-## 📌 Project Overview
-An application for Kerugoya Hospital that manages patient registration, triage queue, appointments, treatment history and department routing using **five different data structures** with SQLite database persistence.
+## Project Overview
+MediStruct is a Tkinter-based desktop application for managing core hospital workflows using data structures taught in OOP and DSA.
 
----
+The system supports:
+- Patient registration and lookup
+- Triage queue management
+- Weekly appointment scheduling
+- Treatment history with undo/redo behavior
+- Department route planning
 
-## 📊 Data Structures Implemented
+Persistence is handled with SQLite so records survive restarts.
 
-| Data Structure | Purpose | Complexity |
-|---------------|--------|------------|
-| Hash Table | Patient records storage (fast lookup) | O(1) avg |
-| Priority Queue | Triage system (Emergency first) | O(log n) |
-| 2D Array | Appointment calendar (7×10 grid) | O(1) |
-| Stack | Treatment history (Undo/Redo) | O(1) |
-| Graph | Department routing (Shortest path) | O(V²) |
+## Why These Data Structures
 
----
+1. Hash Table
+- Perfect for fast patient retrieval by unique ID.
 
-## ✨ Key Features
+2. Priority Queue
+- Essential for emergency medical situations where severity must determine order.
 
-### 1. Patient Registration
-- ✅ Auto-increment IDs (KGH001, KGH002...)
-- ✅ Contact validation (10 digits)
-- ✅ Blood group selection
-- ✅ SQLite database persistence
+3. 2D Array
+- Ideal for a fixed weekly schedule with predictable day/slot coordinates.
 
----
+4. Stack
+- Natural fit for undo/redo in treatment record handling.
 
-### 2. Triage Queue
-- 🔴 Emergency (Priority 1)
-- 🟡 Serious (Priority 2)
-- 🟢 Minor (Priority 3)
-- ✅ Priority-based processing
-- 🎨 Color-coded display
+5. Graph
+- Best for mapping hospital layout and shortest department routes.
 
----
+## Summary Table
 
-### 3. Appointment Calendar
-- 📅 7 days × 10 slots (8AM–5PM)
-- ⏱️ Slot availability checking
-- 📊 Visual weekly schedule
+| Data Structure | Module | Purpose | Real-world Analogy | Time Complexity |
+|---|---|---|---|---|
+| Hash Table | Patient Records | Fast patient lookup | Hospital file cabinet with labeled drawers | O(1) average |
+| Priority Queue | Triage Queue | Emergency patients first | Emergency room waiting list | O(log n) insertion (conceptual priority queue) |
+| 2D Array | Appointments | Fixed schedule grid | Paper appointment book with rows and columns | O(1) slot access |
+| Stack | Treatment History | Undo/redo operations | Stack of medical forms | O(1) push/pop |
+| Graph | Department Routing | Shortest path finding | Hospital map with connected corridors | O(V^2) in current implementation |
 
----
+## Visual Architecture
 
-### 4. Treatment History
-- 🔄 Undo/Redo functionality
-- 👨‍⚕️ Doctor attribution
-- 🕒 Timestamp tracking
+```mermaid
+flowchart LR
+	UI[HospitalApp Tkinter UI] --> Domain[Data Structure Modules]
+	UI --> DB[(SQLite Database)]
+	Domain --> UI
+	Domain --> DB
+```
 
----
+```mermaid
+flowchart TD
+	Register[Register Patient] --> Triage[Triage by Priority]
+	Triage --> Schedule[Book Appointment]
+	Schedule --> Treatment[Record Treatment]
+	Treatment --> Routing[Find Department Route]
+	Routing --> Persist[Persist and Sync]
+```
 
-### 5. Department Routing
-- 🧭 Shortest path using Dijkstra's Algorithm
-- 🏥 8 hospital departments connected
-- ⏳ Distance and time estimation
+## Key Features
 
----
+### Patient Registration
+- Auto-increment patient IDs (`KGH001`, `KGH002`, ...)
+- Contact validation (10-digit input)
+- Blood group and allergy capture
+- Database persistence
 
-## 🗄️ Database Schema
+### Triage Queue
+- Priority levels: Emergency, Serious, Minor
+- Severity-first processing
+- Queue overview and service progression
 
-**Tables:**
-- patients  
-- triage_queue  
-- appointments  
-- treatments  
-- system_settings  
+### Appointment Calendar
+- 7-day x 10-slot schedule model (08:00-17:00)
+- Slot availability checking
+- Weekly schedule display
 
-**Features:**
-- 💾 Auto-save on close  
-- 🔄 Backup & restore support  
-- 🔐 Persistent data storage  
+### Treatment History
+- Treatment capture by patient
+- Doctor attribution and timestamps
+- Undo/redo behavior for recent actions
 
----
+### Department Routing
+- Shortest path calculation between departments
+- Weighted graph representation of movement routes
 
-## 🚀 Quick Start
+## Database Overview
+
+Core tables:
+- `patients`
+- `triage_queue`
+- `appointments`
+- `treatments`
+- `system_settings`
+
+Operational notes:
+- Auto-save/sync on normal app close
+- Backup support through database utility methods
+
+## Quick Start
 
 ### Requirements
 - Python 3.7+
-- Tkinter (comes pre-installed with Python)
+- Tkinter (usually bundled with Python)
 
-### Run the Application
+### Run
+```bash
+python main.py
+```
 
-## 📁 File Structure
-kerugoya_hospital_system/
-├── main.py                 # Main application
-├── database.py             # SQLite operations
-├── hash_table.py           # Hash table for patients
-├── priority_queue.py       # Priority queue for triage
-├── appointment_calendar.py # 2D array calendar
-├── treatment_stack.py      # Stack for undo/redo
-├── hospital_graph.py       # Graph for routing
-└── kerugoya_hospital.db    # Database (auto-created)
+## Project Structure
+
+```text
+MediStruct/
+|- main.py
+|- database.py
+|- hash_table.py
+|- priority_queue.py
+|- appointment_calendar.py
+|- treatment_stack.py
+|- hospital_graph.py
+|- kerugoya_hospital.db
+`- docs/
+   |- ARCHITECTURE.md
+   |- MODULES.md
+   |- DATABASE.md
+   |- USER_GUIDE.md
+   |- DEVELOPER_GUIDE.md
+   |- TROUBLESHOOTING.md
+   `- CHANGELOG.md
+```
+
+## Full Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Module Reference](docs/MODULES.md)
+- [Database Documentation](docs/DATABASE.md)
+- [User Guide](docs/USER_GUIDE.md)
+- [Developer Guide](docs/DEVELOPER_GUIDE.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Changelog](docs/CHANGELOG.md)
+
+## Academic Assessment Support
+
+- [Lecturer Rubric Alignment](docs/ASSESSMENT_ALIGNMENT.md)
+
+This document maps implementation evidence to common grading criteria, including data structure justification, algorithmic reasoning, OOP design, persistence, documentation quality, and testing strategy.
+
+## Current Constraints
+
+- The application is desktop GUI focused and intended for local execution.
+- Main logic and UI orchestration are concentrated in `main.py`.
+- Automated tests are not yet included.
