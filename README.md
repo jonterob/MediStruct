@@ -80,5 +80,15 @@ An application for Kerugoya Hospital that manages patient registration, triage q
 - Tkinter (comes pre-installed with Python)
 
 ### Run the Application
+
+kerugoya_hospital_system/
+├── main.py                 # Main application
+├── database.py             # SQLite operations
+├── hash_table.py           # Hash table for patients
+├── priority_queue.py       # Priority queue for triage
+├── appointment_calendar.py # 2D array calendar
+├── treatment_stack.py      # Stack for undo/redo
+├── hospital_graph.py       # Graph for routing
+└── kerugoya_hospital.db    # Database (auto-created)
 ```bash
 python main.py
