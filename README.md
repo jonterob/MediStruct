@@ -81,6 +81,7 @@ An application for Kerugoya Hospital that manages patient registration, triage q
 
 ### Run the Application
 
+📁 File Structure
 kerugoya_hospital_system/
 ├── main.py                 # Main application
 ├── database.py             # SQLite operations
@@ -90,5 +91,3 @@ kerugoya_hospital_system/
 ├── treatment_stack.py      # Stack for undo/redo
 ├── hospital_graph.py       # Graph for routing
 └── kerugoya_hospital.db    # Database (auto-created)
-```bash
-python main.py
