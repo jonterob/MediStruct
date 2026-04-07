@@ -1,4 +1,4 @@
-# 🏥 Kerugoya Hospital Management System
+# 🏥 Kerugoya Hospital System (MediStruct)
 
 ## 📌 Project Overview
 An application for Kerugoya Hospital that manages patient registration, triage queue, appointments, treatment history and department routing using **five different data structures** with SQLite database persistence.
