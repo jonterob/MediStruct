@@ -1,13 +1,16 @@
 # KERUGOYA HOSPITAL SYSTEM
-# WITH AUTO-INCREMENT ID, VALIDATION, IMPROVED UI, SILENT MESSAGE BOXES, AND SQLITE DATABASE
+# WITH AUTO-INCREMENT ID, VALIDATION, IMPROVED UI, SILENT MESSAGE BOXES AND SQLITE DATABASE
 
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from tkinter import ttk, scrolledtext, filedialog
 from datetime import datetime
 import os
 import json
 import re
 import sys
+import tempfile
+import zipfile
+from xml.sax.saxutils import escape
 
 # Suppress Windows default beep sound on message boxes
 if sys.platform == 'win32':
@@ -346,7 +349,7 @@ class ModernButton(tk.Button):
 class HospitalApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Kerugoya Hospital Management System - Database Edition")
+        self.root.title("Kerugoya Hospital System")
         
         # Make window responsive
         self.root.configure(bg=COLORS['light_bg'])
@@ -453,7 +456,7 @@ class HospitalApp:
             
         except Exception as e:
             print(f"Error loading from database: {e}")
-            self.load_sample_data()
+            self.update_status("Database load failed")
     
     def sync_to_database(self):
         """Sync memory data structures to database"""
@@ -498,7 +501,7 @@ class HospitalApp:
         
         tk.Label(text_frame, text="KERUGOYA HOSPITAL", font=('Segoe UI', 18, 'bold'),
                 bg=COLORS['primary'], fg='white').pack(anchor='w')
-        tk.Label(text_frame, text="Management Information System (SQLite Database)", font=('Segoe UI', 10),
+        tk.Label(text_frame, text="Hospital System", font=('Segoe UI', 10),
                 bg=COLORS['primary'], fg=COLORS['light_bg']).pack(anchor='w')
         
         # Date and time
@@ -740,6 +743,8 @@ class HospitalApp:
                     color='info').pack(side='left', padx=5)
         ModernButton(search_frame, text="Show All", command=self.update_patient_list_display, 
                     color='secondary').pack(side='left', padx=5)
+        ModernButton(search_frame, text="🖨 Export / Print", command=self.export_patient_directory_report,
+                    color='primary').pack(side='left', padx=5)
         
         # Patient list display
         self.patient_list_display = scrolledtext.ScrolledText(frame, height=18, width=100, 
@@ -816,6 +821,8 @@ class HospitalApp:
                     color='danger').pack(side='left', padx=5)
         ModernButton(button_frame, text="🔄 Refresh", command=self.update_queue_display, 
                     color='gray').pack(side='left', padx=5)
+        ModernButton(button_frame, text="🖨 Export / Print", command=self.export_triage_report,
+                    color='primary').pack(side='left', padx=5)
         
         self.update_queue_display()
     
@@ -873,9 +880,13 @@ class HospitalApp:
         self.schedule_display = scrolledtext.ScrolledText(schedule_card, height=18, width=60, 
                                                           font=('Consolas', 9))
         self.schedule_display.pack(pady=10, padx=10, fill='both', expand=True)
-        
-        ModernButton(schedule_card, text="🔄 Refresh Schedule", command=self.update_schedule_display, 
-                    color='info').pack(pady=15)
+
+        schedule_button_frame = tk.Frame(schedule_card, bg=COLORS['white'])
+        schedule_button_frame.pack(pady=15)
+        ModernButton(schedule_button_frame, text="🔄 Refresh Schedule", command=self.update_schedule_display, 
+                    color='info').pack(side='left', padx=5)
+        ModernButton(schedule_button_frame, text="🖨 Export / Print", command=self.export_appointments_report,
+                    color='primary').pack(side='left', padx=5)
         
         self.update_schedule_display()
     
@@ -939,6 +950,8 @@ class HospitalApp:
         self.view_history_entry.pack(side='left', padx=5)
         ModernButton(search_frame, text="Show History", command=self.show_treatment_history, 
                     color='info').pack(side='left', padx=5)
+        ModernButton(search_frame, text="🖨 Export / Print", command=self.export_treatment_history_report,
+                    color='primary').pack(side='left', padx=5)
         
         self.history_display = scrolledtext.ScrolledText(history_card, height=15, width=55, 
                                                          font=('Consolas', 10))
@@ -1011,6 +1024,8 @@ class HospitalApp:
         self.search_entry.pack(side='left', padx=10)
         ModernButton(search_inner, text="🔍 Search", command=self.search_patient, 
                     color='info').pack(side='left', padx=10)
+        ModernButton(search_inner, text="🖨 Export / Print", command=self.export_patient_record_report,
+                    color='primary').pack(side='left', padx=10)
         
         self.search_result = scrolledtext.ScrolledText(frame, height=20, width=90, font=('Consolas', 10))
         self.search_result.pack(pady=20)
@@ -1039,6 +1054,387 @@ class HospitalApp:
     def validate_contact(self, contact):
         """Validate contact number (10 digits)"""
         return contact.isdigit() and len(contact) == 10
+
+    def sanitize_filename(self, text):
+        """Create a safe filename from a label"""
+        clean = re.sub(r'[^A-Za-z0-9._-]+', '_', text.strip())
+        return clean.strip('_') or "report"
+
+    def normalize_export_text(self, content, ascii_only=False):
+        """Normalize UI text for export formats"""
+        replacements = {
+            "→": "->",
+            "•": "-",
+            "✓": "[OK]",
+            "✗": "[X]",
+            "⚠": "[!]",
+            "📊": "[Stats]",
+            "📅": "[Date]",
+            "📞": "[Contact]",
+            "🆔": "[ID]",
+            "👤": "[Name]",
+            "🩸": "[Blood]",
+            "💊": "[Treatment]",
+            "👨‍⚕️": "[Doctor]",
+            "🚑": "[Triage]",
+            "🚨": "[Emergency]",
+            "📍": "[From]",
+            "🎯": "[To]",
+            "🚶": "[Route]",
+            "📏": "[Distance]",
+            "⏱️": "[Time]",
+            "🏥": "[Hospital]",
+            "✨": "[Features]",
+            "🗄️": "[Database]"
+        }
+
+        normalized = content.replace("\r\n", "\n")
+        for old, new in replacements.items():
+            normalized = normalized.replace(old, new)
+
+        if ascii_only:
+            normalized = normalized.encode("ascii", "ignore").decode("ascii")
+
+        return normalized
+
+    def write_text_file(self, filepath, content):
+        """Write plain text export"""
+        with open(filepath, "w", encoding="utf-8") as file:
+            file.write(content)
+
+    def write_pdf_file(self, filepath, title, content):
+        """Write a styled PDF report without external libraries"""
+        normalized_title = self.normalize_export_text(title, ascii_only=True)
+        normalized_content = self.normalize_export_text(content, ascii_only=True)
+
+        page_width = 595
+        page_height = 842
+        margin = 42
+        content_left = 56
+        content_right = page_width - 56
+        header_height = 86
+        footer_height = 34
+        body_top = page_height - header_height - 34
+        body_bottom = margin + footer_height + 12
+        body_width = content_right - content_left
+        line_height = 15
+        chars_per_line = 84
+
+        def escape_pdf_text(text):
+            return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+        def wrap_line(text, limit):
+            words = text.split()
+            if not words:
+                return [""]
+
+            wrapped = []
+            current = words[0]
+
+            for word in words[1:]:
+                candidate = f"{current} {word}"
+                if len(candidate) <= limit:
+                    current = candidate
+                else:
+                    wrapped.append(current)
+                    current = word
+
+            wrapped.append(current)
+            return wrapped
+
+        formatted_lines = []
+        for raw_line in normalized_content.splitlines():
+            stripped = raw_line.strip()
+
+            if not stripped:
+                formatted_lines.append({"text": "", "style": "spacer"})
+                continue
+
+            if set(stripped) == {"="} or set(stripped) == {"-"}:
+                formatted_lines.append({"text": "", "style": "divider"})
+                continue
+
+            is_heading = stripped == stripped.upper() and any(char.isalpha() for char in stripped) and len(stripped) <= 48
+            wrapped_lines = wrap_line(stripped, chars_per_line)
+
+            for index, wrapped in enumerate(wrapped_lines):
+                style = "heading" if is_heading and index == 0 else "body"
+                formatted_lines.append({"text": wrapped, "style": style})
+
+        if not formatted_lines:
+            formatted_lines = [{"text": "No report content available.", "style": "body"}]
+
+        pages = []
+        current_page = []
+        current_y = body_top
+
+        for item in formatted_lines:
+            if item["style"] == "spacer":
+                required_height = 8
+            elif item["style"] == "divider":
+                required_height = 12
+            elif item["style"] == "heading":
+                required_height = 20
+            else:
+                required_height = line_height
+
+            if current_page and current_y - required_height < body_bottom:
+                pages.append(current_page)
+                current_page = []
+                current_y = body_top
+
+            current_page.append(item)
+            current_y -= required_height
+
+        if current_page:
+            pages.append(current_page)
+
+        objects = []
+
+        def add_object(body):
+            objects.append(body)
+            return len(objects)
+
+        font_obj = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+        bold_font_obj = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>")
+        page_ids = []
+        content_ids = []
+
+        generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        for page_number, page_lines in enumerate(pages, start=1):
+            content_stream = [
+                "q",
+                "0.17 0.37 0.54 rg",
+                f"{margin} {page_height - margin - header_height} {page_width - (margin * 2)} {header_height} re f",
+                "0.93 0.96 0.98 rg",
+                f"{margin} {body_bottom - 12} {page_width - (margin * 2)} {body_top - body_bottom + 28} re f",
+                "0.80 0.87 0.92 RG",
+                "1 w",
+                f"{margin} {body_bottom - 12} {page_width - (margin * 2)} {body_top - body_bottom + 28} re S",
+                "BT",
+                "1 1 1 rg",
+                f"/F2 20 Tf 1 0 0 1 {content_left} {page_height - margin - 30} Tm",
+                f"({escape_pdf_text('KERUGOYA HOSPITAL SYSTEM')}) Tj",
+                f"/F1 10 Tf 1 0 0 1 {content_left} {page_height - margin - 48} Tm",
+                f"({escape_pdf_text(normalized_title)}) Tj",
+                f"1 0 0 1 {content_left} {page_height - margin - 64} Tm",
+                f"(Generated on: {escape_pdf_text(generated_at)}) Tj",
+                "0.17 0.37 0.54 rg",
+                f"/F1 9 Tf 1 0 0 1 {page_width - 118} {page_height - margin - 64} Tm",
+                f"(Page {page_number} of {len(pages)}) Tj",
+                "ET"
+            ]
+
+            current_y = body_top
+            for item in page_lines:
+                if item["style"] == "spacer":
+                    current_y -= 8
+                    continue
+
+                if item["style"] == "divider":
+                    line_y = current_y - 4
+                    content_stream.extend([
+                        "0.78 0.84 0.89 RG",
+                        "0.8 w",
+                        f"{content_left} {line_y} m {content_right} {line_y} l S"
+                    ])
+                    current_y -= 12
+                    continue
+
+                if item["style"] == "heading":
+                    content_stream.extend([
+                        "BT",
+                        "0.17 0.37 0.54 rg",
+                        f"/F2 12 Tf 1 0 0 1 {content_left} {current_y} Tm",
+                        f"({escape_pdf_text(item['text'])}) Tj",
+                        "ET"
+                    ])
+                    current_y -= 20
+                    continue
+
+                content_stream.extend([
+                    "BT",
+                    "0.16 0.19 0.24 rg",
+                    f"/F1 10.5 Tf 1 0 0 1 {content_left} {current_y} Tm",
+                    f"({escape_pdf_text(item['text'])}) Tj",
+                    "ET"
+                ])
+                current_y -= line_height
+
+            content_stream.extend([
+                "BT",
+                "0.45 0.50 0.54 rg",
+                f"/F1 9 Tf 1 0 0 1 {content_left} {margin - 2} Tm",
+                f"(Confidential hospital report - {escape_pdf_text(normalized_title)}) Tj",
+                "ET",
+                "Q"
+            ])
+
+            stream_text = "\n".join(content_stream)
+            content_id = add_object(f"<< /Length {len(stream_text.encode('latin-1'))} >>\nstream\n{stream_text}\nendstream")
+            content_ids.append(content_id)
+            page_ids.append(add_object(""))
+
+        pages_obj = add_object("")
+        catalog_obj = add_object(f"<< /Type /Catalog /Pages {pages_obj} 0 R >>")
+
+        for index, page_id in enumerate(page_ids):
+            objects[page_id - 1] = (
+                f"<< /Type /Page /Parent {pages_obj} 0 R /MediaBox [0 0 {page_width} {page_height}] "
+                f"/Resources << /Font << /F1 {font_obj} 0 R /F2 {bold_font_obj} 0 R >> >> /Contents {content_ids[index]} 0 R >>"
+            )
+
+        kids = " ".join(f"{page_id} 0 R" for page_id in page_ids)
+        objects[pages_obj - 1] = f"<< /Type /Pages /Kids [{kids}] /Count {len(page_ids)} >>"
+
+        pdf_parts = ["%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"]
+        offsets = []
+        byte_count = len(pdf_parts[0].encode("latin-1"))
+
+        for obj_id, body in enumerate(objects, start=1):
+            offsets.append(byte_count)
+            chunk = f"{obj_id} 0 obj\n{body}\nendobj\n"
+            pdf_parts.append(chunk)
+            byte_count += len(chunk.encode("latin-1"))
+
+        xref_offset = byte_count
+        xref = [f"xref\n0 {len(objects) + 1}\n", "0000000000 65535 f \n"]
+        xref.extend(f"{offset:010d} 00000 n \n" for offset in offsets)
+        trailer = (
+            f"trailer\n<< /Size {len(objects) + 1} /Root {catalog_obj} 0 R >>\n"
+            f"startxref\n{xref_offset}\n%%EOF"
+        )
+        pdf_parts.extend(xref)
+        pdf_parts.append(trailer)
+
+        with open(filepath, "wb") as file:
+            file.write("".join(pdf_parts).encode("latin-1"))
+
+    def write_docx_file(self, filepath, title, content):
+        """Write a minimal DOCX file without external libraries"""
+        normalized_title = self.normalize_export_text(title)
+        normalized_content = self.normalize_export_text(content)
+
+        paragraphs = [normalized_title, ""]
+        paragraphs.extend(normalized_content.splitlines() or [""])
+
+        document_lines = []
+        for line in paragraphs:
+            safe_text = escape(line)
+            document_lines.append(
+                "<w:p><w:r><w:t xml:space=\"preserve\">"
+                f"{safe_text}"
+                "</w:t></w:r></w:p>"
+            )
+
+        document_xml = (
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+            "<w:document xmlns:wpc=\"http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas\" "
+            "xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" "
+            "xmlns:o=\"urn:schemas-microsoft-com:office:office\" "
+            "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
+            "xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\" "
+            "xmlns:v=\"urn:schemas-microsoft-com:vml\" "
+            "xmlns:wp14=\"http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing\" "
+            "xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" "
+            "xmlns:w10=\"urn:schemas-microsoft-com:office:word\" "
+            "xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" "
+            "xmlns:w14=\"http://schemas.microsoft.com/office/word/2010/wordml\" "
+            "xmlns:wpg=\"http://schemas.microsoft.com/office/word/2010/wordprocessingGroup\" "
+            "xmlns:wpi=\"http://schemas.microsoft.com/office/word/2010/wordprocessingInk\" "
+            "xmlns:wne=\"http://schemas.microsoft.com/office/word/2006/wordml\" "
+            "xmlns:wps=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\" "
+            "mc:Ignorable=\"w14 wp14\">"
+            "<w:body>"
+            + "".join(document_lines) +
+            "<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/><w:pgMar w:top=\"1440\" w:right=\"1440\" "
+            "w:bottom=\"1440\" w:left=\"1440\" w:header=\"708\" w:footer=\"708\" w:gutter=\"0\"/></w:sectPr>"
+            "</w:body></w:document>"
+        )
+
+        content_types_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>"""
+
+        rels_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"""
+
+        with zipfile.ZipFile(filepath, "w", zipfile.ZIP_DEFLATED) as docx_file:
+            docx_file.writestr("[Content_Types].xml", content_types_xml)
+            docx_file.writestr("_rels/.rels", rels_xml)
+            docx_file.writestr("word/document.xml", document_xml)
+
+    def save_report_to_file(self, title, content, default_name):
+        """Save report content as TXT, PDF, or DOCX"""
+        if not content.strip():
+            SilentMessageBox.show_warning("Nothing to Export", "No content available to export.", self.root)
+            return None
+
+        filename = filedialog.asksaveasfilename(
+            parent=self.root,
+            title="Export Report",
+            defaultextension=".pdf",
+            initialfile=self.sanitize_filename(default_name),
+            filetypes=[
+                ("PDF file", "*.pdf"),
+                ("Word document", "*.docx"),
+                ("Text file", "*.txt")
+            ]
+        )
+
+        if not filename:
+            return None
+
+        extension = os.path.splitext(filename)[1].lower()
+        try:
+            if extension == ".pdf":
+                self.write_pdf_file(filename, title, content)
+            elif extension == ".docx":
+                self.write_docx_file(filename, title, content)
+            else:
+                self.write_text_file(filename, self.normalize_export_text(content))
+
+            return filename
+        except Exception as e:
+            SilentMessageBox.show_error("Export Failed", f"❌ Could not export file:\n{e}", self.root)
+            return None
+
+    def print_exported_file(self, filepath):
+        """Send an exported file to the system print command on Windows"""
+        try:
+            if sys.platform == "win32":
+                os.startfile(filepath, "print")
+                self.update_status(f"Sent to printer: {os.path.basename(filepath)}")
+                return True
+
+            SilentMessageBox.show_info("Print Not Supported", "Printing is currently supported on Windows only.", self.root)
+            return False
+        except Exception as e:
+            SilentMessageBox.show_error("Print Failed", f"❌ Could not print file:\n{e}", self.root)
+            return False
+
+    def export_report(self, title, content, default_name, offer_print=True):
+        """Export current screen content and optionally print it"""
+        filepath = self.save_report_to_file(title, content, default_name)
+        if not filepath:
+            return
+
+        self.update_status(f"Exported report: {os.path.basename(filepath)}")
+
+        if offer_print and SilentMessageBox.ask_question("Print Report", "File exported successfully.\n\nPrint it now?", self.root):
+            self.print_exported_file(filepath)
+        else:
+            SilentMessageBox.show_info("Export Complete", f"✅ Report saved to:\n{filepath}", self.root)
+
+    def get_text_widget_content(self, widget):
+        """Read content from text-based widgets"""
+        return widget.get(1.0, tk.END).strip()
     
     def export_to_csv(self):
         """Export patient data to CSV for backup"""
@@ -1150,6 +1546,11 @@ class HospitalApp:
         else:
             self.patient_list_display.insert(tk.END, "No patients registered yet.\nClick 'Patient Registration' tab to add patients.")
             self.patient_stats_label.config(text="📊 Total Patients Registered: 0")
+
+    def export_patient_directory_report(self):
+        """Export the patient directory currently shown on screen"""
+        content = self.get_text_widget_content(self.patient_list_display)
+        self.export_report("Patient Directory Report", content, "patient_directory_report")
     
     def search_in_patient_list(self):
         """Search patient in the list"""
@@ -1259,6 +1660,11 @@ class HospitalApp:
             self.queue_display.insert(tk.END, f"📊 Total waiting: {len(queue_patients)}", "header")
         else:
             self.queue_display.insert(tk.END, "Queue is empty.", "minor")
+
+    def export_triage_report(self):
+        """Export the triage queue currently shown on screen"""
+        content = self.get_text_widget_content(self.queue_display)
+        self.export_report("Triage Queue Report", content, "triage_queue_report")
     
     def book_appointment(self):
         """Book an appointment with database"""
@@ -1297,6 +1703,11 @@ class HospitalApp:
         """Update schedule display"""
         self.schedule_display.delete(1.0, tk.END)
         self.schedule_display.insert(tk.END, self.calendar.display_week_schedule())
+
+    def export_appointments_report(self):
+        """Export the appointment schedule currently shown on screen"""
+        content = self.get_text_widget_content(self.schedule_display)
+        self.export_report("Appointments Schedule Report", content, "appointments_schedule_report")
     
     def add_treatment(self):
         """Add treatment record with database"""
@@ -1364,6 +1775,12 @@ class HospitalApp:
                 self.history_display.insert(tk.END, "-" * 55 + "\n")
         else:
             self.history_display.insert(tk.END, f"No treatment records found for patient {pid}")
+
+    def export_treatment_history_report(self):
+        """Export the current treatment history view"""
+        pid = self.view_history_entry.get().strip() or "patient"
+        content = self.get_text_widget_content(self.history_display)
+        self.export_report("Treatment History Report", content, f"treatment_history_{pid.lower()}")
     
     def find_shortest_path(self):
         """Find shortest path between departments"""
@@ -1435,32 +1852,17 @@ class HospitalApp:
             self.search_result.insert(tk.END, f"❌ Patient {pid} not found in database.\n\n")
             self.search_result.insert(tk.END, "Please check the Patient ID or register the patient first.")
             self.update_status(f"Patient {pid} not found")
-    
-    def load_sample_data(self):
-        """Load sample data for demonstration and save to database"""
-        sample_patients = [
-            ("KGH001", "John Mwangi", "45", "0712345678", "O+", "None"),
-            ("KGH002", "Mary Wanjiku", "30", "0723456789", "A+", "Penicillin"),
-            ("KGH003", "Peter Otieno", "60", "0734567890", "B+", "None"),
-            ("KGH004", "Grace Akinyi", "25", "0745678901", "AB+", "Sulfa")
-        ]
-        
-        for pid, name, age, contact, blood, allergies in sample_patients:
-            patient = PatientRecord(pid, name, age, contact, blood, allergies)
-            self.patient_db.insert(patient)
-            self.db.save_patient(patient)
-        
-        # Update last patient number
-        self.last_patient_number = 4
-        self.db.update_last_patient_number(self.last_patient_number)
-        self.update_patient_list_display()
-        self.update_patient_id_display()
-        self.update_status("Sample data loaded and saved to database")
+
+    def export_patient_record_report(self):
+        """Export the current patient search result"""
+        pid = self.search_entry.get().strip().upper() or "patient_record"
+        content = self.get_text_widget_content(self.search_result)
+        self.export_report("Patient Record Report", content, f"patient_record_{pid.lower()}")
     
     def show_about(self):
         """Show about dialog"""
         SilentMessageBox.show_info("About Kerugoya Hospital System", 
-            "🏥 KERUGOYA HOSPITAL MANAGEMENT SYSTEM\n\nVersion 4.0 (SQLite Database Edition)\n\nDeveloped for CAT 2 Take Away\nMachine Learning Course\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 DATA STRUCTURES IMPLEMENTED:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n✓ Hash Table     → Patient Records (O(1) lookup)\n✓ Priority Queue → Triage System (Emergency first)\n✓ Array          → Appointment Calendar (7x10 grid)\n✓ Stack          → Treatment History (Undo/Redo)\n✓ Graph          → Department Routing (Shortest path)\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🗄️ DATABASE FEATURES:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n• SQLite Database (kerugoya_hospital.db)\n• Auto-save on close\n• Data persists after PC restart\n• Multi-user ready\n• Backup capability\n\n✨ OTHER FEATURES:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n• Auto-increment Patient IDs (KGH001, KGH002...)\n• Contact number validation (10 digits)\n• Blood group dropdown selection\n• Separate Patient Directory tab\n• Silent message boxes (no Windows sound)", self.root)
+            "🏥 KERUGOYA HOSPITAL SYSTEM\n\nVersion 4.0\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 DATA STRUCTURES IMPLEMENTED:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n✓ Hash Table     → Patient Records (O(1) lookup)\n✓ Priority Queue → Triage System (Emergency first)\n✓ Array          → Appointment Calendar (7x10 grid)\n✓ Stack          → Treatment History (Undo/Redo)\n✓ Graph          → Department Routing (Shortest path)\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🗄️ DATABASE FEATURES:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n• SQLite Database (kerugoya_hospital.db)\n• Auto-save on close\n• Data persists after PC restart\n• Multi-user ready\n• Backup capability\n\n✨ OTHER FEATURES:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n• Auto-increment Patient IDs (KGH001, KGH002...)\n• Contact number validation (10 digits)\n• Blood group dropdown selection\n• Separate Patient Directory tab\n• Silent message boxes (no Windows sound)", self.root)
 
 
 # Run the application

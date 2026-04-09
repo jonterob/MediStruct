@@ -1,0 +1,23 @@
+Patient ID,Name,Age,Contact,Blood Group,Allergies
+KGH002,John Gitau,23,0110856352,O+,Sulfa drugs (Sulfonamides)
+
+
+KGH012,Joseph M.,50,0786754333,AB+,Ibuprofen
+KGH004,Joseph Kamangu,30,0789765433,A-,Codeine
+KGH020,Peter Otieno,66,0755646565,B+,Pollen
+KGH006,Ann K,33,0788644456,O-,Morphine
+KGH015,Jemimah,20,0756464566,A+,Tetracycline
+KGH016,Dominic Munene,78,0756533455,O-,None
+KGH017,Joseph Kamau,44,0786457676,O-,None
+KGH018,James Mwangi,43,0755561415,O+,None
+KGH019,Ann Wanjiku,20,0723456789,A+,Penicillin
+KGH021,Mary Atieno,59,0743262667,O-,Sulfa drugs
+KGH022,John Ndung’u,28,0786421134,O-,Peanuts
+KGH023,Grace Chebet,21,0767890123,B+,Latex
+KGH024,Samuel Kipchoge,34,0778901234,AB-,Dust mites
+KGH025,Brian Kimani,67,0790123456,O-,Codeine
+KGH026,Faith Akinyi,20,0711223344,B-,Shellfish
+KGH027,Joseph Maina,34,0722334455,B+,Bee stings
+KGH028,Rebecca Wairimu,56,0733445566,O-,Aspirin
+KGH029,Moses Simiyu,44,0766778899,A+,Milk
+KGH030,Lydia Nekesa,52,0755643533,AB+,Eggs
