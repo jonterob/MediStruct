@@ -38,6 +38,12 @@
 3. Add handler methods and UI refresh methods.
 4. Add persistence methods in `HospitalDatabase` if data should survive restart.
 
+### Theme and Settings Support
+- The `system_settings` table now stores user interface preferences such as `theme`.
+- `main.py` loads the saved theme on startup using `load_system_settings()` and applies it through `change_theme()`.
+- `apply_theme_to_widget()` recursively updates widget colors for the selected theme.
+- Patient selection fields now use `resolve_patient_id()` and `get_patient_dropdown_values()` so appointment, treatment, history, and search workflows support unified ID/name lookup.
+
 ### Add a new data structure module
 1. Create a dedicated module file.
 2. Keep class API focused and testable.

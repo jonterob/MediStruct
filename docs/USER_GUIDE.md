@@ -42,7 +42,7 @@ Operational note:
 
 1. Open the Appointment tab.
 2. Select day and time slot.
-3. Provide patient ID and name.
+3. Select a patient by ID or name using the searchable dropdown field.
 4. Book appointment.
 
 Behavior:
@@ -51,7 +51,7 @@ Behavior:
 ## Record Treatments
 
 1. Open the Treatment tab.
-2. Enter patient ID, treatment details, and doctor.
+2. Select a patient by ID or name using the searchable dropdown field. Then enter treatment details and doctor.
 3. Save treatment.
 4. Use Undo/Redo when needed.
 5. Use history view for patient treatment timeline.
@@ -66,8 +66,19 @@ Behavior:
 ## Search Patients
 
 1. Open Search tab.
-2. Search by patient ID or patient name.
+2. Search by patient ID or patient name in the same search field.
 3. Review details from returned records.
+
+## System Settings
+
+1. Open the Settings tab.
+2. Choose between Light Theme and Dark Theme.
+3. Click Apply Theme to save your preference.
+4. Refresh UI if needed to apply the current colors across the app.
+
+Notes:
+- Theme changes are saved to the database and persist after restarting the app.
+- You can also switch themes from the Settings menu in the top menu bar.
 
 ## Exit and Data Safety
 

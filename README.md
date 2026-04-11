@@ -81,6 +81,14 @@ flowchart TD
 - Doctor attribution and timestamps
 - Undo/redo behavior for recent actions
 
+### Patient Lookup
+- Search by patient ID or patient name from appointment, treatment, history, billing, and search workflows
+- Unified dropdown search improves lookup consistency across the app
+
+### System Settings
+- Light/Dark theme support with persistent preference storage
+- Theme selection is saved in `system_settings` and applied on startup
+
 ### Department Routing
 - Shortest path calculation between departments
 - Weighted graph representation of movement routes
