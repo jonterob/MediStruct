@@ -87,7 +87,10 @@ flowchart TD
 
 ### System Settings
 - Light/Dark theme support with persistent preference storage
-- Theme selection is saved in `system_settings` and applied on startup
+- Default startup tab selection for opening the application on the preferred workflow
+- Optional auto backup on exit
+- Adjustable UI font size for improved accessibility
+- Theme and interface preferences are saved in `system_settings` and applied on startup
 
 ### Department Routing
 - Shortest path calculation between departments

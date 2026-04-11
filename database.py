@@ -124,6 +124,18 @@ class HospitalDatabase:
             INSERT OR IGNORE INTO system_settings (key, value)
             VALUES ('theme', 'light')
         ''')
+        self.cursor.execute('''
+            INSERT OR IGNORE INTO system_settings (key, value)
+            VALUES ('startup_tab', 'Patient Registration')
+        ''')
+        self.cursor.execute('''
+            INSERT OR IGNORE INTO system_settings (key, value)
+            VALUES ('auto_backup_on_exit', 'false')
+        ''')
+        self.cursor.execute('''
+            INSERT OR IGNORE INTO system_settings (key, value)
+            VALUES ('font_size', '10')
+        ''')
         
         self.connection.commit()
         print("✅ All tables created successfully")

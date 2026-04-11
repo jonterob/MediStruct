@@ -39,8 +39,8 @@
 4. Add persistence methods in `HospitalDatabase` if data should survive restart.
 
 ### Theme and Settings Support
-- The `system_settings` table now stores user interface preferences such as `theme`.
-- `main.py` loads the saved theme on startup using `load_system_settings()` and applies it through `change_theme()`.
+- The `system_settings` table now stores user interface preferences such as `theme`, `startup_tab`, `auto_backup_on_exit`, and `font_size`.
+- `main.py` loads saved settings on startup using `load_system_settings()` and applies them through `set_theme()` and `apply_font_size()`.
 - `apply_theme_to_widget()` recursively updates widget colors for the selected theme.
 - Patient selection fields now use `resolve_patient_id()` and `get_patient_dropdown_values()` so appointment, treatment, history, and search workflows support unified ID/name lookup.
 

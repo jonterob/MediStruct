@@ -73,11 +73,14 @@ Behavior:
 
 1. Open the Settings tab.
 2. Choose between Light Theme and Dark Theme.
-3. Click Apply Theme to save your preference.
-4. Refresh UI if needed to apply the current colors across the app.
+3. Choose a default startup tab so the app opens directly to the workflow you use most.
+4. Enable "Backup database on exit" to save a copy automatically when the app closes.
+5. Choose a font size for easier reading.
+6. Click Apply Theme to save your preference.
+7. Refresh UI if needed to apply the current colors and font size across the app.
 
 Notes:
-- Theme changes are saved to the database and persist after restarting the app.
+- Theme changes and startup preferences are saved to the database and persist after restarting the app.
 - You can also switch themes from the Settings menu in the top menu bar.
 
 ## Exit and Data Safety

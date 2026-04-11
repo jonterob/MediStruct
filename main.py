@@ -414,6 +414,9 @@ class HospitalApp:
         # Initialize DATABASE
         self.db = HospitalDatabase("kerugoya_hospital.db")
         self.theme_mode_var = tk.StringVar()
+        self.startup_tab_var = tk.StringVar()
+        self.auto_backup_var = tk.BooleanVar()
+        self.font_size_var = tk.StringVar()
         self.load_system_settings()
         
         # Initialize data structures
@@ -439,6 +442,7 @@ class HospitalApp:
         self.create_header()
         self.create_menu()
         self.create_main_dashboard()
+        self.apply_startup_tab()
         self.create_status_bar()
         
         # FIXED: Update patient ID display WITHOUT auto-incrementing
@@ -503,14 +507,28 @@ class HospitalApp:
             self.update_status("Database load failed")
 
     def load_system_settings(self):
-        """Load system settings such as theme from database."""
+        """Load system settings such as theme and startup preferences from database."""
         try:
             active_theme = self.db.get_system_setting('theme') or 'light'
             self.theme_mode_var.set(active_theme)
             self.set_theme(active_theme)
+
+            startup_tab = self.db.get_system_setting('startup_tab') or 'Patient Registration'
+            self.startup_tab_var.set(startup_tab)
+
+            auto_backup = self.db.get_system_setting('auto_backup_on_exit') or 'false'
+            self.auto_backup_var.set(str(auto_backup).lower() == 'true')
+
+            font_size = self.db.get_system_setting('font_size') or '10'
+            self.font_size_var.set(font_size)
+            self.apply_font_size(font_size)
         except Exception as e:
             print(f"Error loading system settings: {e}")
             self.set_theme('light')
+            self.startup_tab_var.set('Patient Registration')
+            self.auto_backup_var.set(False)
+            self.font_size_var.set('10')
+            self.apply_font_size('10')
 
     def set_theme(self, theme_name):
         """Apply a theme palette to the whole application."""
@@ -547,7 +565,60 @@ class HospitalApp:
         self.db.update_system_setting('theme', selected_theme)
         if hasattr(self, 'current_theme_label'):
             self.current_theme_label.config(text=f"Active theme: {selected_theme.title()}")
+        self.refresh_settings_summary()
         self.update_status(f"Theme set to {selected_theme.title()}")
+
+    def change_startup_tab(self):
+        selected_tab = self.startup_tab_var.get()
+        self.db.update_system_setting('startup_tab', selected_tab)
+        self.refresh_settings_summary()
+        self.update_status(f"Startup tab set to {selected_tab}")
+
+    def change_auto_backup(self):
+        enabled = self.auto_backup_var.get()
+        self.db.update_system_setting('auto_backup_on_exit', str(enabled).lower())
+        self.update_status(f"Auto backup on exit {'enabled' if enabled else 'disabled'}")
+
+    def change_font_size(self):
+        selected_size = self.font_size_var.get()
+        self.db.update_system_setting('font_size', selected_size)
+        self.apply_font_size(selected_size)
+        self.refresh_settings_summary()
+        self.update_status(f"Font size set to {selected_size}")
+
+    def apply_font_size(self, size):
+        try:
+            font_size = int(size)
+        except ValueError:
+            font_size = 10
+        self.root.option_add('*Font', ('Segoe UI', font_size))
+        if hasattr(self, 'root'):
+            self.apply_theme_to_widget(self.root)
+
+    def refresh_settings_summary(self):
+        if hasattr(self, 'current_settings_label'):
+            self.current_settings_label.config(
+                text=f"Theme: {self.active_theme.title()} · Font: {self.font_size_var.get()} · Startup: {self.startup_tab_var.get()}"
+            )
+
+    def apply_startup_tab(self):
+        if not hasattr(self, 'notebook'):
+            return
+        name = self.startup_tab_var.get() or 'Patient Registration'
+        tab_mapping = {
+            'Patient Registration': self.registration_tab,
+            'Edit Patients': self.edit_patient_tab,
+            'Patient Directory': self.patient_list_tab,
+            'Doctors': self.doctor_tab,
+            'Triage Queue': self.triage_tab,
+            'Appointments': self.appointment_tab,
+            'Treatment History': self.treatment_tab,
+            'Billing': self.billing_tab,
+            'Department Routing': self.routing_tab,
+            'Search Patient': self.search_tab,
+            'Settings': self.settings_tab,
+        }
+        self.notebook.select(tab_mapping.get(name, self.registration_tab))
 
     def apply_theme_to_widget(self, widget):
         """Recursively apply theme colors to supported widgets."""
@@ -594,7 +665,9 @@ class HospitalApp:
             return False
     
     def on_closing(self):
-        """Handle application closing - save to database"""
+        """Handle application closing - save to database."""
+        if self.auto_backup_var.get():
+            self.backup_database()
         self.sync_to_database()
         self.db.update_last_patient_number(self.last_patient_number)
         self.db.close()
@@ -864,6 +937,7 @@ class HospitalApp:
         menubar.add_cascade(label="Settings", menu=settings_menu)
         settings_menu.add_radiobutton(label="Light Theme", variable=self.theme_mode_var, value='light', command=self.change_theme)
         settings_menu.add_radiobutton(label="Dark Theme", variable=self.theme_mode_var, value='dark', command=self.change_theme)
+        settings_menu.add_checkbutton(label="Auto Backup on Exit", variable=self.auto_backup_var, command=self.change_auto_backup)
         settings_menu.add_separator()
         settings_menu.add_command(label="Open Settings", command=lambda: self.notebook.select(self.settings_tab))
         
@@ -1898,7 +1972,7 @@ class HospitalApp:
         banner_text.pack(side='left', pady=18)
         tk.Label(banner_text, text="SYSTEM SETTINGS", font=('Segoe UI', 16, 'bold'),
                  bg=COLORS['primary'], fg='white').pack(anchor='w')
-        tk.Label(banner_text, text="Choose your preferred interface theme and save settings across sessions.",
+        tk.Label(banner_text, text="Customize startup behavior, backup preferences, and accessibility settings.",
                  font=('Segoe UI', 10), bg=COLORS['primary'], fg=COLORS['light_bg']).pack(anchor='w', pady=(4, 0))
 
         form_frame = tk.Frame(settings_card, bg=COLORS['white'])
@@ -1916,17 +1990,39 @@ class HospitalApp:
                                                activebackground=COLORS['white'], selectcolor=COLORS['light_bg'], command=self.change_theme)
         self.theme_option_dark.grid(row=1, column=1, sticky='w', padx=8, pady=4)
 
-        tk.Label(form_frame, text="💾 Current Settings", bg=COLORS['white'], fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=2, column=0, sticky='w', padx=8, pady=16)
-        self.current_theme_label = tk.Label(form_frame, text=f"Active theme: {self.active_theme.title()}",
-                                            bg=COLORS['white'], fg=COLORS['text'], font=('Segoe UI', 10))
-        self.current_theme_label.grid(row=2, column=1, sticky='w', padx=8, pady=16)
+        tk.Label(form_frame, text="🚀 Startup Tab", bg=COLORS['white'], fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=2, column=0, sticky='w', padx=8, pady=8)
+        startup_options = [
+            'Patient Registration', 'Edit Patients', 'Patient Directory', 'Doctors',
+            'Triage Queue', 'Appointments', 'Treatment History', 'Billing',
+            'Department Routing', 'Search Patient', 'Settings'
+        ]
+        self.startup_choice = ttk.Combobox(form_frame, textvariable=self.startup_tab_var, values=startup_options, state='readonly')
+        self.startup_choice.grid(row=2, column=1, sticky='we', padx=8, pady=4)
+        self.startup_choice.bind('<<ComboboxSelected>>', lambda _: self.change_startup_tab())
+
+        tk.Label(form_frame, text="💾 Auto Backup", bg=COLORS['white'], fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=3, column=0, sticky='w', padx=8, pady=8)
+        self.auto_backup_toggle = tk.Checkbutton(form_frame, text="Backup database on exit", variable=self.auto_backup_var,
+                                                 bg=COLORS['white'], fg=COLORS['text'], anchor='w', font=('Segoe UI', 10),
+                                                 selectcolor=COLORS['light_bg'], activebackground=COLORS['white'], command=self.change_auto_backup)
+        self.auto_backup_toggle.grid(row=3, column=1, sticky='w', padx=8, pady=4)
+
+        tk.Label(form_frame, text="🔠 Font Size", bg=COLORS['white'], fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=4, column=0, sticky='w', padx=8, pady=8)
+        font_sizes = ['10', '12', '14', '16']
+        self.font_size_choice = ttk.Combobox(form_frame, textvariable=self.font_size_var, values=font_sizes, state='readonly')
+        self.font_size_choice.grid(row=4, column=1, sticky='we', padx=8, pady=4)
+        self.font_size_choice.bind('<<ComboboxSelected>>', lambda _: self.change_font_size())
+
+        tk.Label(form_frame, text="⚙️ Current Settings", bg=COLORS['white'], fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=5, column=0, sticky='w', padx=8, pady=16)
+        self.current_settings_label = tk.Label(form_frame, text=f"Theme: {self.active_theme.title()} · Font: {self.font_size_var.get()} · Startup: {self.startup_tab_var.get()}",
+                                              bg=COLORS['white'], fg=COLORS['text'], font=('Segoe UI', 10), wraplength=520, justify='left')
+        self.current_settings_label.grid(row=5, column=1, sticky='w', padx=8, pady=16)
 
         button_frame = tk.Frame(settings_card, bg=COLORS['white'])
         button_frame.pack(fill='x', padx=24, pady=(0, 10))
         ModernButton(button_frame, text="Apply Theme", command=self.change_theme, color='secondary').pack(side='left', padx=6)
         ModernButton(button_frame, text="Refresh UI", command=lambda: self.apply_theme_to_widget(self.root), color='info').pack(side='left', padx=6)
 
-        note_label = tk.Label(settings_card, text="Theme changes are saved and will persist when the app restarts.",
+        note_label = tk.Label(settings_card, text="Theme changes and startup preferences are saved and will persist when the app restarts.",
                               bg=COLORS['white'], fg=COLORS['gray_dark'], font=('Segoe UI', 10), wraplength=600, justify='left')
         note_label.pack(fill='x', padx=24, pady=(0, 16))
 

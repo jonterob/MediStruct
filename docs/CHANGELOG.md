@@ -20,6 +20,7 @@ All notable changes to this project should be documented in this file.
 - Editorial polish for consistency and clearer operator guidance in user documentation.
 - Unified patient lookup fields across appointment, treatment, history, billing, and search workflows so a single dropdown can search by patient ID or name.
 - Added system settings theme support with Light/Dark mode persistence.
+- Added startup tab selection, auto backup on exit, and font size accessibility controls in system settings.
 
 ### Fixed
 - N/A
