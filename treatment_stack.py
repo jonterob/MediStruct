@@ -55,6 +55,9 @@ class PatientTreatmentHistory:
     
     def get_history(self, patient_id):
         return self.histories.get(patient_id, [])
+
+    def get_all_histories(self):
+        return self.histories.copy()
     
     def __str__(self):
         result = ""

@@ -78,6 +78,34 @@ class HospitalDatabase:
                 FOREIGN KEY (patient_id) REFERENCES patients(patient_id)
             )
         ''')
+
+        # Doctors table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS doctors (
+                doctor_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                specialty TEXT,
+                contact TEXT,
+                availability TEXT,
+                created_date TEXT
+            )
+        ''')
+
+        # Billing table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bills (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id TEXT,
+                patient_name TEXT,
+                service TEXT,
+                amount REAL,
+                status TEXT DEFAULT 'Unpaid',
+                created_date TEXT,
+                paid_date TEXT,
+                notes TEXT,
+                FOREIGN KEY (patient_id) REFERENCES patients(patient_id)
+            )
+        ''')
         
         # System settings table (for auto-increment counter)
         self.cursor.execute('''
@@ -91,6 +119,10 @@ class HospitalDatabase:
         self.cursor.execute('''
             INSERT OR IGNORE INTO system_settings (key, value)
             VALUES ('last_patient_number', '0')
+        ''')
+        self.cursor.execute('''
+            INSERT OR IGNORE INTO system_settings (key, value)
+            VALUES ('theme', 'light')
         ''')
         
         self.connection.commit()
@@ -162,11 +194,30 @@ class HospitalDatabase:
             self.cursor.execute('DELETE FROM triage_queue WHERE patient_id = ?', (patient_id,))
             self.cursor.execute('DELETE FROM appointments WHERE patient_id = ?', (patient_id,))
             self.cursor.execute('DELETE FROM treatments WHERE patient_id = ?', (patient_id,))
+            self.cursor.execute('DELETE FROM bills WHERE patient_id = ?', (patient_id,))
             self.cursor.execute('DELETE FROM patients WHERE patient_id = ?', (patient_id,))
             self.connection.commit()
             return True
         except Exception as e:
             print(f"Error deleting patient: {e}")
+            return False
+
+    def update_patient(self, patient_id, name, age, contact, blood_group, allergies):
+        """Update an existing patient record"""
+        try:
+            self.cursor.execute('''
+                UPDATE patients
+                SET name = ?, age = ?, contact = ?, blood_group = ?, allergies = ?, last_visit = ?
+                WHERE patient_id = ?
+            ''', (
+                name, age, contact, blood_group, allergies,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                patient_id
+            ))
+            self.connection.commit()
+            return self.cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error updating patient: {e}")
             return False
     
     def search_patients(self, search_term):
@@ -343,6 +394,161 @@ class HospitalDatabase:
         except Exception as e:
             print(f"Error getting treatment history: {e}")
             return []
+
+    # ========== DOCTOR OPERATIONS ==========
+
+    def save_doctor(self, doctor_id, name, specialty, contact, availability):
+        """Save or update a doctor"""
+        try:
+            self.cursor.execute('''
+                INSERT OR REPLACE INTO doctors
+                (doctor_id, name, specialty, contact, availability, created_date)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                doctor_id, name, specialty, contact, availability,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error saving doctor: {e}")
+            return False
+
+    def get_all_doctors(self):
+        """Get all doctors"""
+        try:
+            self.cursor.execute('SELECT doctor_id, name, specialty, contact, availability FROM doctors ORDER BY name')
+            rows = self.cursor.fetchall()
+            return [{
+                'doctor_id': row[0],
+                'name': row[1],
+                'specialty': row[2],
+                'contact': row[3],
+                'availability': row[4]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting doctors: {e}")
+            return []
+
+    def get_last_doctor_number(self):
+        """Get the highest numeric doctor id in use"""
+        try:
+            self.cursor.execute('SELECT doctor_id FROM doctors')
+            rows = self.cursor.fetchall()
+            max_number = 0
+            for row in rows:
+                doctor_id = (row[0] or "").strip()
+                digits = ''.join(ch for ch in doctor_id if ch.isdigit())
+                if digits:
+                    max_number = max(max_number, int(digits))
+            return max_number
+        except Exception as e:
+            print(f"Error getting last doctor number: {e}")
+            return 0
+
+    def search_doctors(self, search_term):
+        """Search doctors by id, name, or specialty"""
+        try:
+            self.cursor.execute('''
+                SELECT doctor_id, name, specialty, contact, availability
+                FROM doctors
+                WHERE doctor_id LIKE ? OR name LIKE ? OR specialty LIKE ?
+                ORDER BY name
+            ''', (f'%{search_term}%', f'%{search_term}%', f'%{search_term}%'))
+            rows = self.cursor.fetchall()
+            return [{
+                'doctor_id': row[0],
+                'name': row[1],
+                'specialty': row[2],
+                'contact': row[3],
+                'availability': row[4]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error searching doctors: {e}")
+            return []
+
+    # ========== BILLING OPERATIONS ==========
+
+    def save_bill(self, patient_id, patient_name, service, amount, notes=""):
+        """Create a billing record"""
+        try:
+            self.cursor.execute('''
+                INSERT INTO bills
+                (patient_id, patient_name, service, amount, status, created_date, paid_date, notes)
+                VALUES (?, ?, ?, ?, 'Unpaid', ?, NULL, ?)
+            ''', (
+                patient_id, patient_name, service, amount,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                notes
+            ))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error saving bill: {e}")
+            return False
+
+    def get_all_bills(self):
+        """Get all bills"""
+        try:
+            self.cursor.execute('''
+                SELECT id, patient_id, patient_name, service, amount, status, created_date, paid_date, notes
+                FROM bills
+                ORDER BY id DESC
+            ''')
+            rows = self.cursor.fetchall()
+            return [{
+                'id': row[0],
+                'patient_id': row[1],
+                'patient_name': row[2],
+                'service': row[3],
+                'amount': row[4],
+                'status': row[5],
+                'created_date': row[6],
+                'paid_date': row[7],
+                'notes': row[8]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting bills: {e}")
+            return []
+
+    def get_patient_bills(self, patient_id):
+        """Get bills for a patient"""
+        try:
+            self.cursor.execute('''
+                SELECT id, patient_id, patient_name, service, amount, status, created_date, paid_date, notes
+                FROM bills
+                WHERE patient_id = ?
+                ORDER BY id DESC
+            ''', (patient_id,))
+            rows = self.cursor.fetchall()
+            return [{
+                'id': row[0],
+                'patient_id': row[1],
+                'patient_name': row[2],
+                'service': row[3],
+                'amount': row[4],
+                'status': row[5],
+                'created_date': row[6],
+                'paid_date': row[7],
+                'notes': row[8]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting patient bills: {e}")
+            return []
+
+    def mark_bill_paid(self, bill_id):
+        """Mark a bill as paid"""
+        try:
+            self.cursor.execute('''
+                UPDATE bills
+                SET status = 'Paid', paid_date = ?
+                WHERE id = ?
+            ''', (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), bill_id))
+            self.connection.commit()
+            return self.cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error updating bill payment: {e}")
+            return False
     
     # ========== SYSTEM SETTINGS ==========
     
@@ -366,6 +572,29 @@ class HospitalDatabase:
             return True
         except Exception as e:
             print(f"Error updating last patient number: {e}")
+            return False
+
+    def get_system_setting(self, key):
+        """Get a stored system setting."""
+        try:
+            self.cursor.execute('SELECT value FROM system_settings WHERE key = ?', (key,))
+            row = self.cursor.fetchone()
+            return row[0] if row else None
+        except Exception as e:
+            print(f"Error getting system setting '{key}': {e}")
+            return None
+
+    def update_system_setting(self, key, value):
+        """Update or insert a system setting."""
+        try:
+            self.cursor.execute('''
+                INSERT OR REPLACE INTO system_settings (key, value)
+                VALUES (?, ?)
+            ''', (key, str(value)))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error updating system setting '{key}': {e}")
             return False
     
     # ========== STATISTICS ==========
