@@ -7,18 +7,36 @@
 
 2. On launch, the system:
 - Connects to SQLite
-- Loads saved patients, triage queue, appointments, and treatments
+- Shows the login screen for staff access
+- Loads saved patients, triage queue, appointments, treatments, doctors, billing, and settings
 
 Before operating, verify:
 - You are running from the project root directory.
 - The database file is writable.
-- You can see all workflow tabs in the main window.
+- You can see available workflow tabs after login.
+
+### Default Login
+- Username: `admin`
+- Password: `admin123`
+
+## Staff Login and Roles
+
+1. Enter your staff username and password.
+2. Click Login.
+3. The app loads tabs based on your role.
+
+Role access includes:
+- `Admin`: full access, user management, settings, doctors, billing
+- `Doctor`: patient list, doctor tools, triage, appointments, treatment, search, settings
+- `Nurse`: patient list, triage, appointments, search, settings
+- `Receptionist`: patient registration, patient list, appointments, search, settings
+- `Billing`: patient list, billing, search, settings
 
 ## Register a Patient
 
-1. Open the Registration tab.
+1. Open the Patient Registration tab.
 2. Enter name, age, contact, blood group, and allergies.
-3. Submit to generate/store patient ID.
+3. Submit to generate and persist patient ID.
 
 Validation notes:
 - Contact is expected as a 10-digit value.
@@ -48,13 +66,28 @@ Operational note:
 Behavior:
 - A slot can only hold one active appointment.
 
+## Manage Doctors
+
+1. Open the Doctors tab.
+2. Add or update doctor records with specialty, contact, and availability.
+3. Search or browse the doctor directory.
+4. Use the directory to support treatment and scheduling workflows.
+
+## Billing and Payments
+
+1. Open the Billing tab.
+2. Search for a patient or select from the billing register.
+3. Enter service details, amount, and payment status.
+4. Save billing records and track paid/unpaid invoices.
+
 ## Record Treatments
 
 1. Open the Treatment tab.
-2. Select a patient by ID or name using the searchable dropdown field. Then enter treatment details and doctor.
-3. Save treatment.
-4. Use Undo/Redo when needed.
-5. Use history view for patient treatment timeline.
+2. Select a patient by ID or name using the searchable dropdown field.
+3. Enter treatment details and doctor.
+4. Save treatment.
+5. Use Undo/Redo when needed.
+6. View patient treatment history using the history tab.
 
 ## Find Department Route
 
@@ -65,7 +98,7 @@ Behavior:
 
 ## Search Patients
 
-1. Open Search tab.
+1. Open the Search tab.
 2. Search by patient ID or patient name in the same search field.
 3. Review details from returned records.
 
@@ -90,8 +123,9 @@ Notes:
 
 ## Recommended Daily Flow
 
-1. Register patient.
-2. Add to triage when assessment is needed.
-3. Schedule appointment if follow-up is required.
-4. Record treatment after care is delivered.
-5. Use routing tab for inter-department navigation guidance.
+1. Login with your staff credentials.
+2. Register and verify patient details.
+3. Add patients to triage as needed.
+4. Schedule appointments and capture follow-up care.
+5. Record treatments and update billing/patient history.
+6. Use routing for department navigation support.

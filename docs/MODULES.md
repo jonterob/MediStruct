@@ -14,6 +14,21 @@ Important responsibilities:
 - Route user actions to domain modules
 - Refresh UI views and status outputs
 - Save state on application close
+- Enforce role-based tab access
+- Create login and settings workflows
+
+## auth.py
+Staff authentication and permission model.
+
+Functions and classes:
+- `hash_password(password)`
+- `verify_password(password, password_hash)`
+- `UserAccount`: staff account dataclass
+- `ROLE_PERMISSIONS`: permission sets for each role
+
+Notes:
+- Default admin account is created on first run
+- User roles include `Admin`, `Doctor`, `Nurse`, `Receptionist`, and `Billing`
 
 ## hash_table.py
 In-memory patient index.
@@ -75,7 +90,8 @@ Class:
 - `HospitalDatabase`
 
 Capabilities:
-- Table creation
-- CRUD for patients, triage, appointments, treatments
-- System settings (patient number)
+- Table creation and schema management
+- CRUD for patients, triage, appointments, treatments, doctors, billing, users, and audit logs
+- System settings persistence
 - Statistics and backup operations
+- Audit logging and user management support

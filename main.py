@@ -12,6 +12,11 @@ import tempfile
 import zipfile
 from xml.sax.saxutils import escape
 
+try:
+    from PIL import Image, ImageDraw, ImageTk
+except ImportError:
+    Image = ImageDraw = ImageTk = None
+
 # Suppress Windows default beep sound on message boxes
 if sys.platform == 'win32':
     import ctypes
@@ -30,6 +35,7 @@ from hospital_graph import HospitalGraph
 
 # Import database module
 from database import HospitalDatabase
+from auth import verify_password, USER_ROLES
 
 # Modern color scheme
 COLORS = {
@@ -437,27 +443,19 @@ class HospitalApp:
         
         # Current user session
         self.current_patient_id = None
-        
-        # Create GUI
-        self.create_header()
-        self.create_menu()
-        self.create_main_dashboard()
-        self.apply_startup_tab()
-        self.create_status_bar()
-        
-        # FIXED: Update patient ID display WITHOUT auto-incrementing
-        self.update_patient_id_display()
-        self.update_doctor_id_display()
-        
+        self.current_user = None
+        self.login_frame = None
+        self.user_listbox = None
+
         # Bind close event to auto-save to database
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+        # Show login screen inside the main window before loading the full UI
+        self.show_login_screen()
         
         # Configure grid weights for responsive layout
         self.root.grid_rowconfigure(2, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
-        
-        # Update status
-        self.update_status("Connected to SQLite Database")
     
     def load_from_database(self):
         """Load all data from database into memory data structures"""
@@ -601,6 +599,40 @@ class HospitalApp:
                 text=f"Theme: {self.active_theme.title()} · Font: {self.font_size_var.get()} · Startup: {self.startup_tab_var.get()}"
             )
 
+    def create_user_account(self):
+        """Create a new staff user account from admin settings."""
+        username = self.new_user_username_var.get().strip()
+        password = self.new_user_password_var.get().strip()
+        role = self.new_user_role_var.get().strip()
+
+        if not username or not password or not role:
+            SilentMessageBox.show_error("User Creation Failed", "Please enter a username, password, and role.", self.root)
+            return
+
+        created = self.db.create_user(username, password, role)
+        if created:
+            self.refresh_user_list()
+            self.new_user_username_var.set("")
+            self.new_user_password_var.set("")
+            self.new_user_role_var.set('Receptionist')
+            SilentMessageBox.show_info("User Created", f"User '{username}' has been created.", self.root)
+        else:
+            SilentMessageBox.show_error("User Creation Failed", "Could not create user. The username may already exist.", self.root)
+
+    def refresh_user_list(self):
+        if not hasattr(self, 'user_listbox'):
+            return
+        users = self.db.get_all_users()
+        self.user_listbox.config(state='normal')
+        self.user_listbox.delete('1.0', tk.END)
+        if users:
+            for user in users:
+                status = 'Active' if user['active'] else 'Inactive'
+                self.user_listbox.insert(tk.END, f"{user['username']} — {user['role']} — {status}\n")
+        else:
+            self.user_listbox.insert(tk.END, "No user accounts found.\n")
+        self.user_listbox.config(state='disabled')
+
     def apply_startup_tab(self):
         if not hasattr(self, 'notebook'):
             return
@@ -619,6 +651,46 @@ class HospitalApp:
             'Settings': self.settings_tab,
         }
         self.notebook.select(tab_mapping.get(name, self.registration_tab))
+
+    def apply_role_permissions(self):
+        """Show or hide notebook tabs based on the user's role."""
+        if not self.current_user or not hasattr(self, 'notebook'):
+            return
+
+        role = self.current_user.get('role', 'Receptionist')
+        allowed_tabs = {
+            'Admin': ['registration_tab', 'edit_patient_tab', 'patient_list_tab', 'doctor_tab', 'triage_tab', 'appointment_tab', 'treatment_tab', 'billing_tab', 'routing_tab', 'search_tab', 'settings_tab'],
+            'Doctor': ['patient_list_tab', 'doctor_tab', 'triage_tab', 'appointment_tab', 'treatment_tab', 'search_tab', 'settings_tab'],
+            'Nurse': ['patient_list_tab', 'triage_tab', 'appointment_tab', 'search_tab', 'settings_tab'],
+            'Receptionist': ['registration_tab', 'patient_list_tab', 'appointment_tab', 'search_tab', 'settings_tab'],
+            'Billing': ['patient_list_tab', 'billing_tab', 'search_tab', 'settings_tab']
+        }.get(role, ['registration_tab', 'patient_list_tab', 'search_tab', 'settings_tab'])
+
+        tabs = {
+            'registration_tab': self.registration_tab,
+            'edit_patient_tab': self.edit_patient_tab,
+            'patient_list_tab': self.patient_list_tab,
+            'doctor_tab': self.doctor_tab,
+            'triage_tab': self.triage_tab,
+            'appointment_tab': self.appointment_tab,
+            'treatment_tab': self.treatment_tab,
+            'billing_tab': self.billing_tab,
+            'routing_tab': self.routing_tab,
+            'search_tab': self.search_tab,
+            'settings_tab': self.settings_tab,
+        }
+
+        for key, tab in tabs.items():
+            if key not in allowed_tabs:
+                try:
+                    self.notebook.hide(tab)
+                except Exception:
+                    pass
+            else:
+                try:
+                    self.notebook.add(tab)
+                except Exception:
+                    pass
 
     def apply_theme_to_widget(self, widget):
         """Recursively apply theme colors to supported widgets."""
@@ -657,8 +729,8 @@ class HospitalApp:
             for patient in patients:
                 self.db.save_patient(patient)
             
-            print(f"✅ Synced {len(patients)} patients to database")
-            SilentMessageBox.show_info("Sync Complete", f"✅ Successfully synced {len(patients)} patients to database", self.root)
+            print(f"✅ Synced {len(patients)} patients")
+            SilentMessageBox.show_info("Sync Complete", f"✅ {len(patients)} patients synced successfully", self.root)
             return True
         except Exception as e:
             SilentMessageBox.show_error("Sync Failed", f"❌ Error syncing to database: {e}", self.root)
@@ -847,6 +919,157 @@ class HospitalApp:
         update_stage()
         splash.after(3200, close_splash)
     
+    def initialize_ui(self):
+        """Build the main application UI after successful login."""
+        self.root.deiconify()
+        self.create_header()
+        self.create_menu()
+        self.create_main_dashboard()
+        self.apply_role_permissions()
+        self.apply_startup_tab()
+        self.create_status_bar()
+        self.update_patient_id_display()
+        self.update_doctor_id_display()
+        self.refresh_settings_summary()
+
+    def show_login_screen(self):
+        """Show login prompt inside the main window before the main UI loads."""
+        if hasattr(self, 'login_frame') and self.login_frame:
+            self.login_frame.destroy()
+
+        self.login_frame = tk.Frame(self.root, bg='#eef5fb')
+        self.login_frame.grid(row=0, column=0, sticky='nsew')
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        self.login_frame.grid_rowconfigure(0, weight=1)
+        self.login_frame.grid_columnconfigure(0, weight=1)
+
+        center_wrapper = tk.Frame(self.login_frame, bg='#eef5fb')
+        center_wrapper.grid(row=0, column=0, sticky='nsew')
+        center_wrapper.grid_rowconfigure(0, weight=1)
+        center_wrapper.grid_rowconfigure(1, weight=0)
+        center_wrapper.grid_rowconfigure(2, weight=1)
+        center_wrapper.grid_columnconfigure(0, weight=1)
+        center_wrapper.grid_columnconfigure(1, weight=0)
+        center_wrapper.grid_columnconfigure(2, weight=1)
+
+        shadow = tk.Frame(center_wrapper, bg='#d4e1ed')
+        shadow.grid(row=1, column=1)
+        shadow.grid_propagate(False)
+        shadow.configure(width=620, height=500)
+
+        card = tk.Frame(center_wrapper, bg=COLORS['white'], bd=0, relief='flat', highlightthickness=1, highlightbackground='#dbe4ed', width=600, height=500)
+        card.grid(row=1, column=1)
+        card.grid_propagate(False)
+        card.grid_rowconfigure(0, weight=1)
+        card.grid_columnconfigure(0, weight=1)
+        card.grid_columnconfigure(1, weight=1)
+
+        left_panel = tk.Frame(card, bg=COLORS['primary'])
+        left_panel.grid(row=0, column=0, sticky='nsew')
+        left_panel.grid_propagate(False)
+
+        right_panel = tk.Frame(card, bg=COLORS['white'])
+        right_panel.grid(row=0, column=1, sticky='nsew')
+        right_panel.grid_rowconfigure(0, weight=1)
+        right_panel.grid_columnconfigure(0, weight=1)
+
+        logo_circle = tk.Canvas(left_panel, width=100, height=100, bg=COLORS['primary'], highlightthickness=0)
+        logo_circle.create_oval(6, 6, 94, 94, fill=COLORS['white'], outline='')
+
+        self.login_logo_image = None
+        logo_path = os.path.join(self.base_dir, 'logo.png')
+        if os.path.exists(logo_path):
+            try:
+                if Image is not None and ImageDraw is not None and ImageTk is not None:
+                    pil_img = Image.open(logo_path).convert('RGBA')
+                    pil_img = pil_img.resize((70, 70), Image.ANTIALIAS if hasattr(Image, 'ANTIALIAS') else Image.LANCZOS)
+                    mask = Image.new('L', pil_img.size, 0)
+                    draw = ImageDraw.Draw(mask)
+                    draw.ellipse((0, 0, pil_img.size[0], pil_img.size[1]), fill=255)
+                    pil_img.putalpha(mask)
+                    self.login_logo_image = ImageTk.PhotoImage(pil_img)
+                else:
+                    self.login_logo_image = tk.PhotoImage(file=logo_path)
+                logo_circle.create_image(50, 50, image=self.login_logo_image)
+            except Exception:
+                logo_circle.create_text(50, 50, text='🏥', font=('Segoe UI', 32), fill=COLORS['primary'])
+        else:
+            logo_circle.create_text(50, 50, text='🏥', font=('Segoe UI', 32), fill=COLORS['primary'])
+
+        logo_circle.pack(pady=(48, 16))
+
+        tk.Label(left_panel, text='Kerugoya Hospital', font=('Segoe UI', 16, 'bold'), bg=COLORS['primary'], fg='white', wraplength=220, justify='center').pack(padx=24, pady=(0, 8))
+        tk.Label(left_panel, text='Secure system access for medical staff and hospital administrators.', font=('Segoe UI', 10), bg=COLORS['primary'], fg='#eaf4fb', wraplength=220, justify='center').pack(padx=20)
+
+        left_features = tk.Frame(left_panel, bg=COLORS['primary'])
+        left_features.pack(padx=20, pady=(20, 0), fill='x')
+        for text in ['Fast access', 'Role-based login', 'Encrypted credentials']:
+            feature = tk.Frame(left_features, bg=COLORS['primary'])
+            feature.pack(fill='x', pady=4)
+            tk.Label(feature, text='•', font=('Segoe UI', 10, 'bold'), bg=COLORS['primary'], fg='#eaf4fb').pack(side='left')
+            tk.Label(feature, text=text, font=('Segoe UI', 10), bg=COLORS['primary'], fg='#eaf4fb').pack(side='left', padx=(6, 0))
+
+        form_container = tk.Frame(right_panel, bg=COLORS['white'])
+        form_container.pack(fill='both', expand=True, padx=36, pady=40)
+        form_container.grid_columnconfigure(0, weight=1)
+
+        tk.Label(form_container, text='Welcome Back', font=('Segoe UI', 22, 'bold'), bg=COLORS['white'], fg=COLORS['text']).grid(row=0, column=0, sticky='w')
+        tk.Label(form_container, text='Sign in to continue to the hospital dashboard.', font=('Segoe UI', 10), bg=COLORS['white'], fg=COLORS['gray_dark']).grid(row=1, column=0, sticky='w', pady=(4, 20))
+
+        tk.Label(form_container, text='Username', bg=COLORS['white'], fg=COLORS['text'], anchor='w', font=('Segoe UI', 10, 'bold')).grid(row=2, column=0, sticky='w', pady=(0, 6))
+        self.login_username_var = tk.StringVar()
+        username_entry = tk.Entry(form_container, textvariable=self.login_username_var, font=('Segoe UI', 10), bd=0, relief='solid', highlightthickness=1, highlightbackground=COLORS['border'], highlightcolor=COLORS['primary'], insertbackground=COLORS['text'])
+        username_entry.grid(row=3, column=0, sticky='ew', pady=(0, 14), ipady=10)
+
+        tk.Label(form_container, text='Password', bg=COLORS['white'], fg=COLORS['text'], anchor='w', font=('Segoe UI', 10, 'bold')).grid(row=4, column=0, sticky='w', pady=(0, 6))
+        self.login_password_var = tk.StringVar()
+        password_entry = tk.Entry(form_container, textvariable=self.login_password_var, font=('Segoe UI', 10), bd=0, relief='solid', highlightthickness=1, highlightbackground=COLORS['border'], highlightcolor=COLORS['primary'], show='*', insertbackground=COLORS['text'])
+        password_entry.grid(row=5, column=0, sticky='ew', pady=(0, 24), ipady=10)
+
+        button_frame = tk.Frame(form_container, bg=COLORS['white'])
+        button_frame.grid(row=6, column=0, sticky='ew')
+        button_frame.grid_columnconfigure(0, weight=1)
+        button_frame.grid_columnconfigure(1, weight=1)
+
+        tk.Button(button_frame, text='Login', command=self.authenticate_user, bg=COLORS['primary'], fg='white', font=('Segoe UI', 10, 'bold'), bd=0, padx=20, pady=14, cursor='hand2', activebackground=COLORS['primary_light']).grid(row=0, column=0, sticky='ew')
+        tk.Button(button_frame, text='Exit', command=self.root.destroy, bg=COLORS['gray'], fg='white', font=('Segoe UI', 10, 'bold'), bd=0, padx=20, pady=14, cursor='hand2', activebackground=COLORS['gray_dark']).grid(row=0, column=1, sticky='ew', padx=(14, 0))
+
+        footer = tk.Label(form_container, text='Admin and staff accounts only.', font=('Segoe UI', 8), bg=COLORS['white'], fg=COLORS['gray_dark'])
+        footer.grid(row=7, column=0, sticky='w', pady=(22, 0))
+
+        self.root.bind('<Return>', lambda event: self.authenticate_user())
+        username_entry.focus()
+
+    def authenticate_user(self):
+        """Verify login credentials and initialize the app on success."""
+        username = self.login_username_var.get().strip()
+        password = self.login_password_var.get().strip()
+        if not username or not password:
+            SilentMessageBox.show_error("Login Failed", "Please enter a username and password.", self.root)
+            return
+
+        user = self.db.get_user_by_username(username)
+        if not user:
+            SilentMessageBox.show_error("Login Failed", "Invalid username or password.", self.root)
+            return
+
+        if not user['active']:
+            SilentMessageBox.show_error("Login Failed", "This account is deactivated.", self.root)
+            return
+
+        if not verify_password(password, user['password_hash']):
+            SilentMessageBox.show_error("Login Failed", "Invalid username or password.", self.root)
+            return
+
+        self.current_user = user
+        self.db.audit_action(username, 'login', f"Logged in as {username} ({user['role']})")
+        if hasattr(self, 'login_frame') and self.login_frame:
+            self.login_frame.destroy()
+            self.login_frame = None
+        self.root.unbind('<Return>')
+        self.initialize_ui()
+
     def create_header(self):
         """Create modern header with logo and title"""
         header_frame = tk.Frame(self.root, bg=COLORS['primary'], height=80)
@@ -953,17 +1176,19 @@ class HospitalApp:
         status_frame.grid(row=3, column=0, sticky='ew', pady=(10, 0))
         status_frame.grid_propagate(False)
         
-        self.status_label = tk.Label(status_frame, text="Connected to SQLite Database", font=('Segoe UI', 9),
+        self.status_label = tk.Label(status_frame, text="Connected to secure storage", font=('Segoe UI', 9),
                                      bg=COLORS['gray'], fg='white')
         self.status_label.pack(side='left', padx=10)
         
         # Database indicator
-        self.db_indicator = tk.Label(status_frame, text="● SQLite Active", font=('Segoe UI', 9),
+        self.db_indicator = tk.Label(status_frame, text="● Storage Active", font=('Segoe UI', 9),
                                        bg=COLORS['gray'], fg=COLORS['secondary'])
         self.db_indicator.pack(side='right', padx=10)
     
     def update_status(self, message):
         """Update status bar message"""
+        if not hasattr(self, 'status_label') or self.status_label is None:
+            return
         self.status_label.config(text=message)
         self.root.after(3000, lambda: self.status_label.config(text="Ready"))
     
@@ -1961,7 +2186,24 @@ class HospitalApp:
         self.settings_tab = tk.Frame(self.notebook, bg=COLORS['light_bg'])
         self.notebook.add(self.settings_tab, text="⚙️ Settings")
 
-        settings_card = tk.Frame(self.settings_tab, bg=COLORS['white'], relief='flat', bd=0)
+        settings_canvas = tk.Canvas(self.settings_tab, bg=COLORS['light_bg'], highlightthickness=0)
+        settings_scrollbar = ttk.Scrollbar(self.settings_tab, orient='vertical', command=settings_canvas.yview)
+        settings_canvas.configure(yscrollcommand=settings_scrollbar.set)
+        settings_scrollbar.pack(side='right', fill='y')
+        settings_canvas.pack(side='left', fill='both', expand=True)
+
+        settings_container = tk.Frame(settings_canvas, bg=COLORS['light_bg'])
+        settings_canvas.create_window((0, 0), window=settings_container, anchor='nw')
+
+        def _on_settings_configure(event):
+            settings_canvas.configure(scrollregion=settings_canvas.bbox('all'))
+        settings_container.bind('<Configure>', _on_settings_configure)
+
+        def _on_mousewheel(event):
+            settings_canvas.yview_scroll(int(-1 * (event.delta / 120)), 'units')
+        settings_canvas.bind_all('<MouseWheel>', _on_mousewheel)
+
+        settings_card = tk.Frame(settings_container, bg=COLORS['white'], relief='flat', bd=0)
         settings_card.pack(fill='both', expand=True, padx=16, pady=16)
 
         banner = tk.Frame(settings_card, bg=COLORS['primary'], height=86)
@@ -2021,6 +2263,36 @@ class HospitalApp:
         button_frame.pack(fill='x', padx=24, pady=(0, 10))
         ModernButton(button_frame, text="Apply Theme", command=self.change_theme, color='secondary').pack(side='left', padx=6)
         ModernButton(button_frame, text="Refresh UI", command=lambda: self.apply_theme_to_widget(self.root), color='info').pack(side='left', padx=6)
+
+        if self.current_user and self.current_user.get('role') == 'Admin':
+            admin_section = tk.LabelFrame(settings_card, text="👥 User Management", bg='#f8fbfd', fg=COLORS['primary'], font=('Segoe UI', 14, 'bold'), relief='groove', bd=1, labelanchor='n')
+            admin_section.pack(fill='both', padx=24, pady=(10, 16), expand=True)
+
+            admin_form = tk.Frame(admin_section, bg='#f8fbfd')
+            admin_form.pack(fill='x', padx=16, pady=16)
+            admin_form.grid_columnconfigure(1, weight=1)
+
+            tk.Label(admin_form, text="Username", bg='#f8fbfd', fg=COLORS['text'], font=('Segoe UI', 10, 'bold')).grid(row=0, column=0, sticky='w', padx=8, pady=4)
+            self.new_user_username_var = tk.StringVar()
+            tk.Entry(admin_form, textvariable=self.new_user_username_var, font=('Segoe UI', 10), bd=1, relief='solid').grid(row=0, column=1, sticky='ew', padx=8, pady=4)
+
+            tk.Label(admin_form, text="Password", bg='#f8fbfd', fg=COLORS['text'], font=('Segoe UI', 10, 'bold')).grid(row=1, column=0, sticky='w', padx=8, pady=4)
+            self.new_user_password_var = tk.StringVar()
+            tk.Entry(admin_form, textvariable=self.new_user_password_var, font=('Segoe UI', 10), bd=1, relief='solid', show='*').grid(row=1, column=1, sticky='ew', padx=8, pady=4)
+
+            tk.Label(admin_form, text="Role", bg='#f8fbfd', fg=COLORS['text'], font=('Segoe UI', 10, 'bold')).grid(row=2, column=0, sticky='w', padx=8, pady=4)
+            self.new_user_role_var = tk.StringVar(value='Receptionist')
+            ttk.Combobox(admin_form, textvariable=self.new_user_role_var, values=USER_ROLES, state='readonly', font=('Segoe UI', 10)).grid(row=2, column=1, sticky='ew', padx=8, pady=4)
+
+            tk.Button(admin_form, text="Create User", command=self.create_user_account, bg=COLORS['secondary'], fg='white', font=('Segoe UI', 10, 'bold'), bd=0, padx=16, pady=8, cursor='hand2').grid(row=3, column=1, sticky='e', padx=8, pady=(12, 4))
+
+            tk.Label(admin_section, text="Existing Users", bg='#f8fbfd', fg=COLORS['text'], font=('Segoe UI', 11, 'bold')).pack(anchor='w', padx=16, pady=(10, 4))
+            self.user_listbox = scrolledtext.ScrolledText(admin_section, height=8, font=('Segoe UI', 10), bg='white', fg=COLORS['text'], relief='solid', bd=1)
+            self.user_listbox.pack(fill='both', padx=16, pady=(0, 16), expand=True)
+            self.user_listbox.config(state='disabled')
+            self.refresh_user_list()
+        else:
+            tk.Label(settings_card, text="User management is available to Admin accounts only.", bg=COLORS['white'], fg=COLORS['gray_dark'], font=('Segoe UI', 10), wraplength=600, justify='left').pack(fill='x', padx=24, pady=(0, 16))
 
         note_label = tk.Label(settings_card, text="Theme changes and startup preferences are saved and will persist when the app restarts.",
                               bg=COLORS['white'], fg=COLORS['gray_dark'], font=('Segoe UI', 10), wraplength=600, justify='left')
@@ -2813,7 +3085,7 @@ class HospitalApp:
             # Save to DATABASE (counter already updated in generate_patient_id)
             if self.db.save_patient(patient):
                 SilentMessageBox.show_info("Success", 
-                    f"✅ Patient {name} registered successfully!\n\n🆔 Patient ID: {patient_id}\n💾 Saved to SQLite Database", self.root)
+                    f"✅ Patient {name} registered successfully!\n\n🆔 Patient ID: {patient_id}\n💾 Saved securely", self.root)
                 
                 self.clear_registration_form()
                 self.update_patient_list_display()

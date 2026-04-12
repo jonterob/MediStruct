@@ -3,7 +3,9 @@
 
 import sqlite3
 import json
+import hashlib
 from datetime import datetime
+from auth import hash_password
 
 class HospitalDatabase:
     def __init__(self, db_name="hospital.db"):
@@ -114,6 +116,29 @@ class HospitalDatabase:
                 value TEXT
             )
         ''')
+
+        # Users and roles table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL,
+                display_name TEXT,
+                active INTEGER DEFAULT 1,
+                created_at TEXT
+            )
+        ''')
+
+        # Audit log table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                username TEXT,
+                action TEXT,
+                details TEXT
+            )
+        ''')
         
         # Insert default settings if not exists
         self.cursor.execute('''
@@ -136,6 +161,19 @@ class HospitalDatabase:
             INSERT OR IGNORE INTO system_settings (key, value)
             VALUES ('font_size', '10')
         ''')
+
+        # Default admin account
+        self.cursor.execute('''
+            INSERT OR IGNORE INTO users (username, password_hash, role, display_name, active, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            'admin',
+            hash_password('admin123'),
+            'Admin',
+            'System Administrator',
+            1,
+            datetime.now().isoformat()
+        ))
         
         self.connection.commit()
         print("✅ All tables created successfully")
@@ -607,6 +645,108 @@ class HospitalDatabase:
             return True
         except Exception as e:
             print(f"Error updating system setting '{key}': {e}")
+            return False
+
+    def create_user(self, username, password, role='Receptionist', display_name=None, active=True):
+        """Create a new user account."""
+        try:
+            password_hash = hash_password(password)
+            self.cursor.execute('''
+                INSERT INTO users (username, password_hash, role, display_name, active, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                username,
+                password_hash,
+                role,
+                display_name or username,
+                1 if active else 0,
+                datetime.now().isoformat()
+            ))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error creating user '{username}': {e}")
+            return False
+
+    def get_user_by_username(self, username):
+        """Return a single user record by username."""
+        try:
+            self.cursor.execute('''
+                SELECT username, password_hash, role, display_name, active, created_at
+                FROM users
+                WHERE username = ?
+            ''', (username,))
+            row = self.cursor.fetchone()
+            if not row:
+                return None
+            return {
+                'username': row[0],
+                'password_hash': row[1],
+                'role': row[2],
+                'display_name': row[3],
+                'active': bool(row[4]),
+                'created_at': row[5]
+            }
+        except Exception as e:
+            print(f"Error fetching user '{username}': {e}")
+            return None
+
+    def get_all_users(self):
+        """Return all user accounts."""
+        try:
+            self.cursor.execute('''
+                SELECT username, role, display_name, active, created_at
+                FROM users
+                ORDER BY role, username
+            ''')
+            rows = self.cursor.fetchall()
+            return [{
+                'username': row[0],
+                'role': row[1],
+                'display_name': row[2],
+                'active': bool(row[3]),
+                'created_at': row[4]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error fetching users: {e}")
+            return []
+
+    def update_user_role(self, username, role):
+        """Update a user role."""
+        try:
+            self.cursor.execute('UPDATE users SET role = ? WHERE username = ?', (role, username))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error updating role for {username}: {e}")
+            return False
+
+    def deactivate_user(self, username):
+        """Deactivate a user account."""
+        try:
+            self.cursor.execute('UPDATE users SET active = 0 WHERE username = ?', (username,))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error deactivating user {username}: {e}")
+            return False
+
+    def audit_action(self, username, action, details=''):
+        """Log a user activity or system event."""
+        try:
+            self.cursor.execute('''
+                INSERT INTO audit_log (timestamp, username, action, details)
+                VALUES (?, ?, ?, ?)
+            ''', (
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                username,
+                action,
+                details
+            ))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error writing audit log: {e}")
             return False
     
     # ========== STATISTICS ==========

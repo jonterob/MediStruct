@@ -58,15 +58,65 @@ Columns:
 - `treatment_date` TEXT
 - `notes` TEXT
 
+### doctors
+Stores doctor records and availability.
+
+Columns:
+- `doctor_id` TEXT PRIMARY KEY
+- `name` TEXT NOT NULL
+- `specialty` TEXT
+- `contact` TEXT
+- `availability` TEXT
+- `created_date` TEXT
+
+### bills
+Stores billing records and payment status.
+
+Columns:
+- `id` INTEGER PRIMARY KEY AUTOINCREMENT
+- `patient_id` TEXT
+- `patient_name` TEXT
+- `service` TEXT
+- `amount` REAL
+- `status` TEXT DEFAULT 'Unpaid'
+- `created_date` TEXT
+- `paid_date` TEXT
+- `notes` TEXT
+
+### users
+Stores authenticated staff accounts and role assignments.
+
+Columns:
+- `username` TEXT PRIMARY KEY
+- `password_hash` TEXT NOT NULL
+- `role` TEXT NOT NULL
+- `display_name` TEXT
+- `active` INTEGER DEFAULT 1
+- `created_at` TEXT
+
 ### system_settings
-Stores app settings such as auto-increment counters.
+Stores application preferences.
 
 Columns:
 - `key` TEXT PRIMARY KEY
 - `value` TEXT
 
-Default key inserted:
+Default keys inserted:
 - `last_patient_number` = `0`
+- `theme` = `light`
+- `startup_tab` = `Patient Registration`
+- `auto_backup_on_exit` = `false`
+- `font_size` = `10`
+
+### audit_log
+Stores user activity and system events.
+
+Columns:
+- `id` INTEGER PRIMARY KEY AUTOINCREMENT
+- `timestamp` TEXT
+- `username` TEXT
+- `action` TEXT
+- `details` TEXT
 
 ## CRUD and Workflow Behavior
 
@@ -76,6 +126,10 @@ Default key inserted:
 - Triage serving marks one row as `served` using `serve_next_patient()`.
 - Appointment booking prevents duplicate active slot occupancy.
 - Treatment insertion updates patient `last_visit` timestamp.
+- Doctor records are created and queried through doctor management flows.
+- Billing records are captured, filtered, and displayed through the billing UI.
+- User accounts are managed with password hashing and role-based permissions.
+- Audit events record login and staff activity.
 
 ## Statistics
 

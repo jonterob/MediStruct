@@ -1,14 +1,18 @@
 # MediStruct (Kerugoya Hospital Management System)
 
 ## Project Overview
-MediStruct is a Tkinter-based desktop application for managing core hospital workflows using data structures taught in OOP and DSA.
+MediStruct is a Tkinter-based desktop application for managing hospital workflows with SQLite persistence, role-based staff access, and core data structures taught in OOP and DSA.
 
 The system supports:
+- Staff login and role-based workflow access
 - Patient registration and lookup
 - Triage queue management
 - Weekly appointment scheduling
+- Doctor directory and availability management
+- Billing and payments tracking
 - Treatment history with undo/redo behavior
 - Department route planning
+- Audit logging and system settings persistence
 
 Persistence is handled with SQLite so records survive restarts.
 
@@ -34,7 +38,7 @@ Persistence is handled with SQLite so records survive restarts.
 | Data Structure | Module | Purpose | Real-world Analogy | Time Complexity |
 |---|---|---|---|---|
 | Hash Table | Patient Records | Fast patient lookup | Hospital file cabinet with labeled drawers | O(1) average |
-| Priority Queue | Triage Queue | Emergency patients first | Emergency room waiting list | O(log n) insertion (conceptual priority queue) |
+| Priority Queue | Triage Queue | Emergency patients first | Emergency room waiting list | O(log n) insertion + ordering |
 | 2D Array | Appointments | Fixed schedule grid | Paper appointment book with rows and columns | O(1) slot access |
 | Stack | Treatment History | Undo/redo operations | Stack of medical forms | O(1) push/pop |
 | Graph | Department Routing | Shortest path finding | Hospital map with connected corridors | O(V^2) in current implementation |
@@ -43,10 +47,12 @@ Persistence is handled with SQLite so records survive restarts.
 
 ```mermaid
 flowchart LR
-	UI[HospitalApp Tkinter UI] --> Domain[Data Structure Modules]
+	Login[Authentication / auth.py] --> UI[HospitalApp Tkinter UI]
+	UI --> Domain[Data Structure Modules]
 	UI --> DB[(SQLite Database)]
 	Domain --> UI
 	Domain --> DB
+	DB --> Audit[Audit Log]
 ```
 
 ```mermaid
@@ -59,6 +65,11 @@ flowchart TD
 ```
 
 ## Key Features
+
+### Authentication and Role Access
+- Secure staff login with default admin account
+- Role-based tabs and permissions for Admin, Doctor, Nurse, Receptionist, and Billing
+- Audit logging of key actions and login events
 
 ### Patient Registration
 - Auto-increment patient IDs (`KGH001`, `KGH002`, ...)
@@ -76,21 +87,31 @@ flowchart TD
 - Slot availability checking
 - Weekly schedule display
 
+### Doctor Directory
+- Register and manage doctors
+- Specialty, contact, and availability tracking
+- Search and browse doctor records
+
+### Billing
+- Patient billing records and invoice tracking
+- Payment status updates and notes
+- Billing register with search and filter options
+
 ### Treatment History
 - Treatment capture by patient
 - Doctor attribution and timestamps
 - Undo/redo behavior for recent actions
 
 ### Patient Lookup
-- Search by patient ID or patient name from appointment, treatment, history, billing, and search workflows
+- Search by patient ID or patient name across multiple workflows
 - Unified dropdown search improves lookup consistency across the app
 
 ### System Settings
 - Light/Dark theme support with persistent preference storage
-- Default startup tab selection for opening the application on the preferred workflow
+- Default startup tab selection
 - Optional auto backup on exit
 - Adjustable UI font size for improved accessibility
-- Theme and interface preferences are saved in `system_settings` and applied on startup
+- Theme and preference values are saved in `system_settings`
 
 ### Department Routing
 - Shortest path calculation between departments
@@ -103,11 +124,16 @@ Core tables:
 - `triage_queue`
 - `appointments`
 - `treatments`
+- `doctors`
+- `bills`
+- `users`
 - `system_settings`
+- `audit_log`
 
 Operational notes:
 - Auto-save/sync on normal app close
 - Backup support through database utility methods
+- Role-based users and permissions are managed via `auth.py`
 
 ## Quick Start
 
@@ -120,11 +146,16 @@ Operational notes:
 python main.py
 ```
 
+### Default Login
+- Username: `admin`
+- Password: `admin123`
+
 ## Project Structure
 
 ```text
 MediStruct/
 |- main.py
+|- auth.py
 |- database.py
 |- hash_table.py
 |- priority_queue.py
