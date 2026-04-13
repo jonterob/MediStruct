@@ -18,8 +18,16 @@ class HospitalDatabase:
     def connect(self):
         """Connect to SQLite database"""
         self.connection = sqlite3.connect(self.db_name)
+        
+        # Enable Write-Ahead Logging (WAL) for concurrency and crash safety
+        self.connection.execute('PRAGMA journal_mode=WAL;')
+        # Optimize synchronization for WAL mode
+        self.connection.execute('PRAGMA synchronous=NORMAL;')
+        # Enforce foreign key constraints for data integrity
+        self.connection.execute('PRAGMA foreign_keys=ON;')
+        
         self.cursor = self.connection.cursor()
-        print(f"✅ Connected to database: {self.db_name}")
+        print(f"✅ Connected to database: {self.db_name} (WAL Mode Enabled)")
     
     def create_tables(self):
         """Create all necessary tables"""
@@ -197,6 +205,30 @@ class HospitalDatabase:
             return True
         except Exception as e:
             print(f"Error saving patient: {e}")
+            return False
+
+    def save_patients_batch(self, patients):
+        """Save multiple patients in a single transaction for efficiency and atomicity"""
+        if not patients:
+            return True
+        try:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            data = [
+                (p.patient_id, p.name, p.age, p.contact, p.blood_group, p.allergies, now, now)
+                for p in patients
+            ]
+            # Explicit transaction start
+            self.connection.execute("BEGIN TRANSACTION")
+            self.cursor.executemany('''
+                INSERT OR REPLACE INTO patients 
+                (patient_id, name, age, contact, blood_group, allergies, registration_date, last_visit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', data)
+            self.connection.commit()
+            return True
+        except Exception as e:
+            self.connection.rollback()
+            print(f"Error during batch patient save: {e}")
             return False
     
     def get_patient(self, patient_id):

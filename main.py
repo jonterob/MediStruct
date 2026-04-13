@@ -467,6 +467,7 @@ class HospitalApp:
                     p['patient_id'], p['name'], p['age'],
                     p['contact'], p['blood_group'], p['allergies']
                 )
+                patient.mark_clean()  # Data from DB is clean
                 self.patient_db.insert(patient)
             
             # Load triage queue
@@ -724,13 +725,13 @@ class HospitalApp:
     def sync_to_database(self):
         """Sync memory data structures to database"""
         try:
-            # Save all patients
-            patients = self.patient_db.get_all()
-            for patient in patients:
-                self.db.save_patient(patient)
-            
-            print(f"✅ Synced {len(patients)} patients")
-            SilentMessageBox.show_info("Sync Complete", f"✅ {len(patients)} patients synced successfully", self.root)
+            # Only sync patients that have been modified
+            dirty_patients = [p for p in self.patient_db.get_all() if p.dirty]
+            if dirty_patients:
+                if self.db.save_patients_batch(dirty_patients):
+                    for p in dirty_patients:
+                        p.mark_clean()
+            print(f"✅ Synced {len(dirty_patients)} modified patients")
             return True
         except Exception as e:
             SilentMessageBox.show_error("Sync Failed", f"❌ Error syncing to database: {e}", self.root)
@@ -738,12 +739,17 @@ class HospitalApp:
     
     def on_closing(self):
         """Handle application closing - save to database."""
-        if self.auto_backup_var.get():
-            self.backup_database()
-        self.sync_to_database()
-        self.db.update_last_patient_number(self.last_patient_number)
-        self.db.close()
-        self.root.destroy()
+        try:
+            if self.auto_backup_var.get():
+                self.backup_database()
+            # Perform final syncs
+            self.sync_to_database()
+            self.db.update_last_patient_number(self.last_patient_number)
+        except Exception as e:
+            print(f"Error during shutdown sync: {e}")
+        finally:
+            self.db.close()
+            self.root.destroy()
 
     def logout(self):
         """Logout the current user and return to the login screen."""
@@ -756,7 +762,16 @@ class HospitalApp:
         self.sync_to_database()
         self.db.update_last_patient_number(self.last_patient_number)
         self.current_user = None
-        self.root.config(menu='')
+
+        if hasattr(self, 'datetime_update_job') and self.datetime_update_job:
+            self.root.after_cancel(self.datetime_update_job)
+            self.datetime_update_job = None
+        if hasattr(self, 'status_after_id') and self.status_after_id:
+            self.root.after_cancel(self.status_after_id)
+            self.status_after_id = None
+
+        self.root.config(menu=None)
+        self.root.unbind('<Return>')
 
         for widget in self.root.winfo_children():
             widget.destroy()
@@ -1146,11 +1161,14 @@ class HospitalApp:
     
     def update_datetime(self):
         """Update date and time display"""
+        if not hasattr(self, 'date_label') or not self.date_label.winfo_exists():
+            return
+
         now = datetime.now()
         self.date_label.config(text=now.strftime("%A, %B %d, %Y"))
         self.time_label.config(text=now.strftime("%I:%M:%S %p"))
-        self.root.after(1000, self.update_datetime)
-    
+        self.datetime_update_job = self.root.after(1000, self.update_datetime)
+
     def create_menu(self):
         """Create modern menu bar with database options"""
         menubar = tk.Menu(self.root, bg=COLORS['primary'], fg='white', activebackground=COLORS['primary_light'])
@@ -1210,8 +1228,12 @@ class HospitalApp:
         if not hasattr(self, 'status_label') or self.status_label is None:
             return
         self.status_label.config(text=message)
-        self.root.after(3000, lambda: self.status_label.config(text="Ready"))
-    
+        self.status_after_id = self.root.after(3000, self._reset_status_ready)
+
+    def _reset_status_ready(self):
+        if hasattr(self, 'status_label') and self.status_label is not None and self.status_label.winfo_exists():
+            self.status_label.config(text="Ready")
+
     def backup_database(self):
         """Create database backup"""
         backup_file = self.db.backup_database()
