@@ -1,4 +1,4 @@
-# MediStruct (Kerugoya Hospital Management System)
+# MediStruct (Kerugoya Hospital System)
 
 ## Project Overview
 MediStruct is a Tkinter-based desktop application for managing hospital workflows with SQLite persistence, role-based staff access, and core data structures taught in OOP and DSA.
