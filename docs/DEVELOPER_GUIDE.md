@@ -44,6 +44,8 @@
 - `auth.py` manages staff accounts, password hashing, roles, and permissions.
 - Default admin account is created on first run with username `admin`.
 - `main.py` uses role-specific tab access to hide or show workflow tabs.
+- `logout()` method syncs data, clears UI, and returns to login screen without closing the app.
+- `authenticate_user()` validates credentials and establishes the current user session.
 
 ### Theme and Settings Support
 - The `system_settings` table stores user interface preferences such as `theme`, `startup_tab`, `auto_backup_on_exit`, and `font_size`.

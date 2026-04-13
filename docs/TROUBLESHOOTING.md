@@ -57,8 +57,33 @@ Checks:
 1. Ensure start and end department names are valid graph nodes.
 2. Validate graph adjacency configuration in `hospital_graph.py`.
 
+## Login and Session Issues
+
+Symptoms:
+- Login screen appears but credentials fail.
+- Cannot logout or switch users.
+- Session state is corrupted after logout.
+
+Checks:
+1. Verify username and password are correct (default admin/admin123).
+2. Confirm the user account is active in the database.
+3. Use File → Logout to properly end sessions; do not force-close the window.
+4. If logout hangs, check database sync (`on_closing()`) is not blocked.
+5. Clear any cached credentials by restarting the application.
+
 ## Backup and Recovery
 
 1. Use `backup_database()` before bulk cleanup.
 2. To recover, replace active DB file with backup copy while app is closed.
 3. Restart app and verify patient count/statistics.
+
+## Settings Tab Not Filling Full Screen
+
+Symptoms:
+- Settings panel appears narrow or only uses half the window width.
+
+Checks:
+1. Ensure the settings canvas is properly configured to expand with the window.
+2. Verify grid layout in `create_settings_tab()` uses `fill='both', expand=True`.
+3. Try resizing the application window to trigger layout recalculation.
+4. If issue persists, check for conflicting pack/grid geometry managers on parent frames.

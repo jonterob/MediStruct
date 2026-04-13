@@ -745,6 +745,24 @@ class HospitalApp:
         self.db.close()
         self.root.destroy()
 
+    def logout(self):
+        """Logout the current user and return to the login screen."""
+        if self.current_user:
+            username = self.current_user.get('username', 'Unknown')
+            role = self.current_user.get('role', 'Unknown')
+            self.db.audit_action(username, 'logout', f"Logged out {username} ({role})")
+            self.update_status(f"Logging out {username}...")
+
+        self.sync_to_database()
+        self.db.update_last_patient_number(self.last_patient_number)
+        self.current_user = None
+        self.root.config(menu='')
+
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        self.show_login_screen()
+
     def find_logo_path(self, extensions):
         """Return the first matching logo path from common project locations."""
         search_paths = [
@@ -1143,6 +1161,8 @@ class HospitalApp:
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Sync to Database", command=self.sync_to_database)
         file_menu.add_command(label="Backup Database", command=self.backup_database)
+        file_menu.add_separator()
+        file_menu.add_command(label="Logout", command=self.logout)
         file_menu.add_separator()
         file_menu.add_command(label="Export to CSV", command=self.export_to_csv)
         file_menu.add_separator()
@@ -2193,11 +2213,15 @@ class HospitalApp:
         settings_canvas.pack(side='left', fill='both', expand=True)
 
         settings_container = tk.Frame(settings_canvas, bg=COLORS['light_bg'])
-        settings_canvas.create_window((0, 0), window=settings_container, anchor='nw')
+        settings_window = settings_canvas.create_window((0, 0), window=settings_container, anchor='nw')
 
         def _on_settings_configure(event):
             settings_canvas.configure(scrollregion=settings_canvas.bbox('all'))
         settings_container.bind('<Configure>', _on_settings_configure)
+
+        def _on_canvas_resize(event):
+            settings_canvas.itemconfig(settings_window, width=event.width)
+        settings_canvas.bind('<Configure>', _on_canvas_resize)
 
         def _on_mousewheel(event):
             settings_canvas.yview_scroll(int(-1 * (event.delta / 120)), 'units')
@@ -2218,7 +2242,7 @@ class HospitalApp:
                  font=('Segoe UI', 10), bg=COLORS['primary'], fg=COLORS['light_bg']).pack(anchor='w', pady=(4, 0))
 
         form_frame = tk.Frame(settings_card, bg=COLORS['white'])
-        form_frame.pack(fill='x', padx=24, pady=24)
+        form_frame.pack(fill='both', expand=True, padx=24, pady=24)
         form_frame.grid_columnconfigure(0, weight=1)
         form_frame.grid_columnconfigure(1, weight=2)
 

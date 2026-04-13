@@ -32,6 +32,17 @@ Role access includes:
 - `Receptionist`: patient registration, patient list, appointments, search, settings
 - `Billing`: patient list, billing, search, settings
 
+## Logout and Session Management
+
+1. To logout, open the File menu and select Logout.
+2. All unsaved data is synced to the database.
+3. You are returned to the login screen without closing the app.
+4. You can log back in with the same or different credentials.
+
+Notes:
+- Logout syncs your current work automatically—no data is lost.
+- Use Logout to switch accounts without restarting the application.
+
 ## Register a Patient
 
 1. Open the Patient Registration tab.
@@ -104,21 +115,32 @@ Behavior:
 
 ## System Settings
 
-1. Open the Settings tab.
-2. Choose between Light Theme and Dark Theme.
-3. Choose a default startup tab so the app opens directly to the workflow you use most.
-4. Enable "Backup database on exit" to save a copy automatically when the app closes.
-5. Choose a font size for easier reading.
-6. Click Apply Theme to save your preference.
-7. Refresh UI if needed to apply the current colors and font size across the app.
+1. Open the Settings tab (⚙️ Settings).
+2. Adjust your preferences:
+   - **Theme**: Choose Light Theme or Dark Theme
+   - **Startup Tab**: Select which tab opens by default on app launch
+   - **Auto Backup**: Enable automatic database backup on exit
+   - **Font Size**: Choose from 10, 12, 14, or 16pt
+3. Click "Apply Theme" to save theme changes.
+4. Click "Refresh UI" to immediately apply selected theme colors and fonts.
+5. Current settings are displayed at the bottom and persist after app restart.
+
+### Admin User Management
+- Admins only: Create new staff accounts under the "User Management" section
+- Enter username, password, and select a role (Admin, Doctor, Nurse, Receptionist, or Billing)
+- Click "Create User" to add the account
+- View existing users in the "Existing Users" list
 
 Notes:
 - Theme changes and startup preferences are saved to the database and persist after restarting the app.
 - You can also switch themes from the Settings menu in the top menu bar.
+- Settings panel uses full-screen layout for better visibility and accessibility.
 
 ## Exit and Data Safety
 
-- Close app normally so sync and last patient number are saved.
+- **Logout**: Use File → Logout to end your session and return to the login screen. All data is synced automatically.
+- **Exit App**: Use File → Exit to close the application. If auto-backup is enabled, a database backup is created.
+- Normal close/logout triggers sync and last patient number saves.
 - Use backup from menu/options before major cleanup operations.
 
 ## Recommended Daily Flow
