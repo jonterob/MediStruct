@@ -4,7 +4,7 @@
 
 - Engine: SQLite
 - Access layer: `HospitalDatabase` in `database.py`
-- Default database file used by app: `kerugoya_hospital.db`
+- Default database file used by app: `medistruct.db`
 
 ## Tables
 

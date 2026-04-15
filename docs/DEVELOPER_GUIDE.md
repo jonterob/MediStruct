@@ -22,7 +22,7 @@
 - `appointment_calendar.py`: appointment grid
 - `treatment_stack.py`: treatment stack/history
 - `hospital_graph.py`: route graph
-- `kerugoya_hospital.db`: SQLite database file
+- `medistruct.db`: SQLite database file
 
 ## Architecture Conventions
 

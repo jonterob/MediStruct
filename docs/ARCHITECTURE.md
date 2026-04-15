@@ -33,7 +33,7 @@ Core workflows include:
 
 4. Persistence layer
 - `database.py` (`HospitalDatabase`)
-- SQLite database file: `kerugoya_hospital.db`
+- SQLite database file: `medistruct.db`
 - Tables include `patients`, `triage_queue`, `appointments`, `treatments`, `doctors`, `bills`, `users`, `system_settings`, and `audit_log`
 
 ## Data Flow
@@ -73,7 +73,7 @@ Undo/Redo]
 	UI --> DS5[HospitalGraph
 Routing]
 	UI --> DB[(SQLite
-kerugoya_hospital.db)]
+medistruct.db)]
 	DB --> Audit[Audit Log]
 
 	DS1 --> UI

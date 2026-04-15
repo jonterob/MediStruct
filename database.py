@@ -1,6 +1,7 @@
 # database.py
-# SQLite Database connection for Kerugoya Hospital System
+# SQLite Database connection for MediStruct
 
+import os
 import sqlite3
 import json
 import hashlib
@@ -8,7 +9,14 @@ from datetime import datetime
 from auth import hash_password
 
 class HospitalDatabase:
-    def __init__(self, db_name="hospital.db"):
+    def __init__(self, db_name="medistruct.db"):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if db_name == "medistruct.db":
+            default_db_path = os.path.join(script_dir, db_name)
+            legacy_db_path = os.path.join(script_dir, "kerugoya_hospital.db")
+            if not os.path.exists(default_db_path) and os.path.exists(legacy_db_path):
+                db_name = legacy_db_path
+                print("⚠️ Using legacy database file kerugoya_hospital.db until physical rename is complete.")
         self.db_name = db_name
         self.connection = None
         self.cursor = None

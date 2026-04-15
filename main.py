@@ -1,4 +1,4 @@
-# KERUGOYA HOSPITAL SYSTEM
+# MEDISTRUCT
 # WITH AUTO-INCREMENT ID, VALIDATION, IMPROVED UI, SILENT MESSAGE BOXES AND SQLITE DATABASE
 
 import tkinter as tk
@@ -13,9 +13,9 @@ import zipfile
 from xml.sax.saxutils import escape
 
 try:
-    from PIL import Image, ImageDraw, ImageTk
+    from PIL import Image, ImageDraw, ImageTk, ImageOps
 except ImportError:
-    Image = ImageDraw = ImageTk = None
+    Image = ImageDraw = ImageTk = ImageOps = None
 
 # Suppress Windows default beep sound on message boxes
 if sys.platform == 'win32':
@@ -392,7 +392,7 @@ class ModernButton(tk.Button):
 class HospitalApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Kerugoya Hospital System")
+        self.root.title("MediStruct")
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
         self.header_logo_image = None
         
@@ -418,7 +418,7 @@ class HospitalApp:
         self.root.grid_columnconfigure(0, weight=1)
         
         # Initialize DATABASE
-        self.db = HospitalDatabase("kerugoya_hospital.db")
+        self.db = HospitalDatabase("medistruct.db")
         self.theme_mode_var = tk.StringVar()
         self.startup_tab_var = tk.StringVar()
         self.auto_backup_var = tk.BooleanVar()
@@ -825,6 +825,26 @@ class HospitalApp:
             print(f"Could not load logo image: {e}")
             return None
 
+    def load_circular_logo(self, logo_path, size):
+        """Load a logo image, crop transparent margin, and resize it to fit the target size."""
+        if Image is None or ImageTk is None or ImageOps is None:
+            return None
+
+        try:
+            pil_img = Image.open(logo_path).convert('RGBA')
+            bbox = pil_img.getbbox()
+            if bbox:
+                pil_img = pil_img.crop(bbox)
+            pil_img = ImageOps.contain(
+                pil_img,
+                (size, size),
+                method=Image.ANTIALIAS if hasattr(Image, 'ANTIALIAS') else Image.LANCZOS
+            )
+            return ImageTk.PhotoImage(pil_img)
+        except Exception as e:
+            print(f"Could not load circular logo image: {e}")
+            return None
+
     def load_header_logo(self):
         """Load the smaller logo used in the header."""
         return self.load_logo_image(48)
@@ -905,7 +925,7 @@ class HospitalApp:
         splash_badge.pack(pady=(30, 18))
         tk.Label(
             container,
-            text="KERUGOYA HOSPITAL",
+            text="MediStruct",
             font=('Segoe UI', 20, 'bold'),
             bg=COLORS['white'],
             fg=COLORS['primary']
@@ -1014,15 +1034,8 @@ class HospitalApp:
         logo_path = os.path.join(self.base_dir, 'logo.png')
         if os.path.exists(logo_path):
             try:
-                if Image is not None and ImageDraw is not None and ImageTk is not None:
-                    pil_img = Image.open(logo_path).convert('RGBA')
-                    pil_img = pil_img.resize((70, 70), Image.ANTIALIAS if hasattr(Image, 'ANTIALIAS') else Image.LANCZOS)
-                    mask = Image.new('L', pil_img.size, 0)
-                    draw = ImageDraw.Draw(mask)
-                    draw.ellipse((0, 0, pil_img.size[0], pil_img.size[1]), fill=255)
-                    pil_img.putalpha(mask)
-                    self.login_logo_image = ImageTk.PhotoImage(pil_img)
-                else:
+                self.login_logo_image = self.load_circular_logo(logo_path, 70)
+                if self.login_logo_image is None:
                     self.login_logo_image = tk.PhotoImage(file=logo_path)
                 logo_circle.create_image(50, 50, image=self.login_logo_image)
             except Exception:
@@ -1032,7 +1045,7 @@ class HospitalApp:
 
         logo_circle.pack(pady=(48, 16))
 
-        tk.Label(left_panel, text='Kerugoya Hospital', font=('Segoe UI', 16, 'bold'), bg=COLORS['primary'], fg='white', wraplength=220, justify='center').pack(padx=24, pady=(0, 8))
+        tk.Label(left_panel, text='MediStruct', font=('Segoe UI', 16, 'bold'), bg=COLORS['primary'], fg='white', wraplength=220, justify='center').pack(padx=24, pady=(0, 8))
         tk.Label(left_panel, text='Secure system access for medical staff and hospital administrators.', font=('Segoe UI', 10), bg=COLORS['primary'], fg='#eaf4fb', wraplength=220, justify='center').pack(padx=20)
 
         left_features = tk.Frame(left_panel, bg=COLORS['primary'])
@@ -1141,7 +1154,7 @@ class HospitalApp:
         text_frame = tk.Frame(title_frame, bg=COLORS['primary'])
         text_frame.pack(side='left')
         
-        tk.Label(text_frame, text="KERUGOYA HOSPITAL", font=('Segoe UI', 18, 'bold'),
+        tk.Label(text_frame, text="MediStruct", font=('Segoe UI', 18, 'bold'),
                 bg=COLORS['primary'], fg='white').pack(anchor='w')
         tk.Label(text_frame, text="Hospital System", font=('Segoe UI', 10),
                 bg=COLORS['primary'], fg=COLORS['light_bg']).pack(anchor='w')
@@ -1244,13 +1257,13 @@ class HospitalApp:
         """Show database statistics"""
         stats = self.db.get_statistics()
         
-        stats_text = f"📊 HOSPITAL DATABASE STATISTICS\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n👥 Total Patients:      {stats.get('total_patients', 0)}\n\n📅 Today's Appointments: {stats.get('today_appointments', 0)}\n\n🚑 Waiting in Triage:    {stats.get('waiting_triage', 0)}\n🔴 Emergency Waiting:    {stats.get('emergency_waiting', 0)}\n\n💾 Database File:        kerugoya_hospital.db"
+        stats_text = f"📊 HOSPITAL DATABASE STATISTICS\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n👥 Total Patients:      {stats.get('total_patients', 0)}\n\n📅 Today's Appointments: {stats.get('today_appointments', 0)}\n\n🚑 Waiting in Triage:    {stats.get('waiting_triage', 0)}\n🔴 Emergency Waiting:    {stats.get('emergency_waiting', 0)}\n\n💾 Database File:        medistruct.db"
         
         SilentMessageBox.show_info("Database Statistics", stats_text, self.root)
     
     def show_db_info(self):
         """Show database information"""
-        info_text = "📁 DATABASE INFORMATION\n\nDatabase File: kerugoya_hospital.db\nType: SQLite (Serverless)\n\nTables Created:\n✓ patients\n✓ triage_queue\n✓ appointments\n✓ treatments\n✓ doctors\n✓ bills\n✓ system_settings\n\nFeatures:\n✓ Auto-save on close\n✓ Data persists after PC restart\n✓ Multi-user ready\n✓ Backup capability"
+        info_text = "📁 DATABASE INFORMATION\n\nDatabase File: medistruct.db\nType: SQLite (Serverless)\n\nTables Created:\n✓ patients\n✓ triage_queue\n✓ appointments\n✓ treatments\n✓ doctors\n✓ bills\n✓ system_settings\n\nFeatures:\n✓ Auto-save on close\n✓ Data persists after PC restart\n✓ Multi-user ready\n✓ Backup capability"
         
         SilentMessageBox.show_info("Database Information", info_text, self.root)
     
@@ -2836,7 +2849,7 @@ class HospitalApp:
                 "BT",
                 "1 1 1 rg",
                 f"/F2 20 Tf 1 0 0 1 {content_left} {page_height - margin - 30} Tm",
-                f"({escape_pdf_text('KERUGOYA HOSPITAL SYSTEM')}) Tj",
+                f"({escape_pdf_text('MediStruct')}) Tj",
                 f"/F1 10 Tf 1 0 0 1 {content_left} {page_height - margin - 48} Tm",
                 f"({escape_pdf_text(normalized_title)}) Tj",
                 f"1 0 0 1 {content_left} {page_height - margin - 64} Tm",
@@ -3926,8 +3939,8 @@ class HospitalApp:
     
     def show_about(self):
         """Show about dialog"""
-        SilentMessageBox.show_info("About Kerugoya Hospital System", 
-            "🏥 KERUGOYA HOSPITAL SYSTEM\n\nVersion 4.0\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 DATA STRUCTURES IMPLEMENTED:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n✓ Hash Table     → Patient Records (O(1) lookup)\n✓ Priority Queue → Triage System (Emergency first)\n✓ Array          → Appointment Calendar (7x10 grid)\n✓ Stack          → Treatment History (Undo/Redo)\n✓ Graph          → Department Routing (Shortest path)\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🗄️ DATABASE FEATURES:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n• SQLite Database (kerugoya_hospital.db)\n• Auto-save on close\n• Data persists after PC restart\n• Multi-user ready\n• Backup capability\n\n✨ OTHER FEATURES:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n• Auto-increment Patient IDs (KGH001, KGH002...)\n• Contact number validation (10 digits)\n• Blood group dropdown selection\n• Separate Patient Directory tab\n• Doctor management module\n• Billing and payments module\n• Patient record editing module\n• Silent message boxes (no Windows sound)", self.root)
+        SilentMessageBox.show_info("About MediStruct", 
+            "🏥 MEDISTRUCT\n\nVersion 4.0\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 DATA STRUCTURES IMPLEMENTED:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n✓ Hash Table     → Patient Records (O(1) lookup)\n✓ Priority Queue → Triage System (Emergency first)\n✓ Array          → Appointment Calendar (7x10 grid)\n✓ Stack          → Treatment History (Undo/Redo)\n✓ Graph          → Department Routing (Shortest path)\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🗄️ DATABASE FEATURES:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n• SQLite Database (medistruct.db)\n• Auto-save on close\n• Data persists after PC restart\n• Multi-user ready\n• Backup capability\n\n✨ OTHER FEATURES:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n• Auto-increment Patient IDs (KGH001, KGH002...)\n• Contact number validation (10 digits)\n• Blood group dropdown selection\n• Separate Patient Directory tab\n• Doctor management module\n• Billing and payments module\n• Patient record editing module\n• Silent message boxes (no Windows sound)", self.root)
 
 
 # Run the application
