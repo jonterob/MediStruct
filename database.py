@@ -40,6 +40,17 @@ class HospitalDatabase:
     def create_tables(self):
         """Create all necessary tables"""
         
+        # Hospital table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS hospitals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                address TEXT,
+                phone TEXT,
+                created_date TEXT
+            )
+        ''')
+
         # Patients table
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS patients (
@@ -49,11 +60,123 @@ class HospitalDatabase:
                 contact TEXT,
                 blood_group TEXT,
                 allergies TEXT,
+                medical_record_number TEXT,
+                insurance_provider TEXT,
+                policy_number TEXT,
+                emergency_contact TEXT,
+                primary_physician TEXT,
+                next_of_kin TEXT,
+                address TEXT,
+                hospital_id INTEGER,
                 registration_date TEXT,
-                last_visit TEXT
+                last_visit TEXT,
+                FOREIGN KEY(hospital_id) REFERENCES hospitals(id)
             )
         ''')
-        
+
+        # Wards table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS wards (
+                ward_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                level TEXT,
+                capacity INTEGER DEFAULT 0,
+                hospital_id INTEGER,
+                created_date TEXT,
+                FOREIGN KEY(hospital_id) REFERENCES hospitals(id)
+            )
+        ''')
+
+        # Beds table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS beds (
+                bed_id TEXT PRIMARY KEY,
+                ward_id TEXT,
+                room_number TEXT,
+                status TEXT DEFAULT 'available',
+                patient_id TEXT,
+                created_date TEXT,
+                FOREIGN KEY(ward_id) REFERENCES wards(ward_id),
+                FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
+            )
+        ''')
+
+        # Admissions table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS admissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id TEXT,
+                ward_id TEXT,
+                bed_id TEXT,
+                admission_date TEXT,
+                expected_discharge_date TEXT,
+                discharge_date TEXT,
+                status TEXT DEFAULT 'admitted',
+                notes TEXT,
+                FOREIGN KEY(patient_id) REFERENCES patients(patient_id),
+                FOREIGN KEY(ward_id) REFERENCES wards(ward_id),
+                FOREIGN KEY(bed_id) REFERENCES beds(bed_id)
+            )
+        ''')
+
+        # Lab orders table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS lab_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id TEXT,
+                order_code TEXT,
+                test_name TEXT,
+                requested_by TEXT,
+                status TEXT DEFAULT 'requested',
+                ordered_date TEXT,
+                result_text TEXT,
+                result_date TEXT,
+                FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
+            )
+        ''')
+
+        # Medication inventory table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS medication_inventory (
+                med_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                dosage_form TEXT,
+                quantity INTEGER DEFAULT 0,
+                unit_price REAL DEFAULT 0.0,
+                last_updated TEXT
+            )
+        ''')
+
+        # Insurance claims table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS insurance_claims (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id TEXT,
+                provider TEXT,
+                policy_number TEXT,
+                claim_status TEXT DEFAULT 'submitted',
+                amount REAL DEFAULT 0.0,
+                submitted_date TEXT,
+                processed_date TEXT,
+                notes TEXT,
+                FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
+            )
+        ''')
+
+        # Documents table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id TEXT,
+                document_type TEXT,
+                filename TEXT,
+                file_path TEXT,
+                uploaded_date TEXT,
+                description TEXT,
+                FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
+            )
+        ''')
+
         # Triage queue table
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS triage_queue (
@@ -190,10 +313,76 @@ class HospitalDatabase:
             1,
             datetime.now().isoformat()
         ))
+
+        # Ensure any legacy patient table gets the new hospital-scale columns
+        self._ensure_patient_table_columns()
+
+        # Default hospital and ward records for larger facility support
+        self.cursor.execute('''
+            INSERT OR IGNORE INTO hospitals (id, name, address, phone, created_date)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (
+            1,
+            'Central Hospital',
+            '123 Health Way, Countyville',
+            '+1-800-HEALTH',
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ))
+
+        self.cursor.execute('''
+            INSERT OR IGNORE INTO wards (ward_id, name, level, capacity, hospital_id, created_date)
+            VALUES
+                ('WARD1', 'General Medicine', 'Level 1', 20, 1, ?),
+                ('WARD2', 'Surgery', 'Level 2', 20, 1, ?),
+                ('WARD3', 'Maternity', 'Level 2', 15, 1, ?)
+        ''', (
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ))
+
+        # Create a few initial beds for operations
+        default_beds = [
+            ('BED01', 'WARD1', '101', 'available'),
+            ('BED02', 'WARD1', '102', 'available'),
+            ('BED03', 'WARD1', '103', 'available'),
+            ('BED11', 'WARD2', '201', 'available'),
+            ('BED12', 'WARD2', '202', 'available'),
+            ('BED21', 'WARD3', '301', 'available')
+        ]
+        for bed_id, ward_id, room_number, status in default_beds:
+            self.cursor.execute('''
+                INSERT OR IGNORE INTO beds (bed_id, ward_id, room_number, status, created_date)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (bed_id, ward_id, room_number, status, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         
         self.connection.commit()
         print("✅ All tables created successfully")
     
+    def _ensure_patient_table_columns(self):
+        """Add missing columns to the patients table if using an older database schema."""
+        try:
+            self.cursor.execute('PRAGMA table_info(patients)')
+            columns = [row[1] for row in self.cursor.fetchall()]
+            required_columns = [
+                ('medical_record_number', 'TEXT'),
+                ('insurance_provider', 'TEXT'),
+                ('policy_number', 'TEXT'),
+                ('emergency_contact', 'TEXT'),
+                ('primary_physician', 'TEXT'),
+                ('next_of_kin', 'TEXT'),
+                ('address', 'TEXT'),
+                ('hospital_id', 'INTEGER'),
+                ('registration_date', 'TEXT'),
+                ('last_visit', 'TEXT')
+            ]
+            for name, col_type in required_columns:
+                if name not in columns:
+                    self.cursor.execute(f'ALTER TABLE patients ADD COLUMN {name} {col_type}')
+            self.connection.commit()
+        except Exception as e:
+            print(f"Warning: could not migrate patient schema: {e}")
+
     # ========== PATIENT OPERATIONS ==========
     
     def save_patient(self, patient):
@@ -201,11 +390,25 @@ class HospitalDatabase:
         try:
             self.cursor.execute('''
                 INSERT OR REPLACE INTO patients 
-                (patient_id, name, age, contact, blood_group, allergies, registration_date, last_visit)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (patient_id, name, age, contact, blood_group, allergies, medical_record_number,
+                 insurance_provider, policy_number, emergency_contact, primary_physician, next_of_kin,
+                 address, hospital_id, registration_date, last_visit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                patient.patient_id, patient.name, patient.age, 
-                patient.contact, patient.blood_group, patient.allergies,
+                patient.patient_id,
+                patient.name,
+                patient.age,
+                patient.contact,
+                patient.blood_group,
+                patient.allergies,
+                getattr(patient, 'medical_record_number', None),
+                getattr(patient, 'insurance_provider', None),
+                getattr(patient, 'policy_number', None),
+                getattr(patient, 'emergency_contact', None),
+                getattr(patient, 'primary_physician', None),
+                getattr(patient, 'next_of_kin', None),
+                getattr(patient, 'address', None),
+                getattr(patient, 'hospital_id', None),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             ))
@@ -265,42 +468,335 @@ class HospitalDatabase:
         try:
             self.cursor.execute('SELECT * FROM patients ORDER BY patient_id')
             rows = self.cursor.fetchall()
-            return [{
-                'patient_id': row[0],
-                'name': row[1],
-                'age': row[2],
-                'contact': row[3],
-                'blood_group': row[4],
-                'allergies': row[5]
-            } for row in rows]
+            patients = []
+            for row in rows:
+                patients.append({
+                    'patient_id': row[0] if len(row) > 0 else None,
+                    'name': row[1] if len(row) > 1 else None,
+                    'age': row[2] if len(row) > 2 else None,
+                    'contact': row[3] if len(row) > 3 else None,
+                    'blood_group': row[4] if len(row) > 4 else None,
+                    'allergies': row[5] if len(row) > 5 else None,
+                    'medical_record_number': row[6] if len(row) > 6 else None,
+                    'insurance_provider': row[7] if len(row) > 7 else None,
+                    'policy_number': row[8] if len(row) > 8 else None,
+                    'emergency_contact': row[9] if len(row) > 9 else None,
+                    'primary_physician': row[10] if len(row) > 10 else None,
+                    'next_of_kin': row[11] if len(row) > 11 else None,
+                    'address': row[12] if len(row) > 12 else None,
+                    'hospital_id': row[13] if len(row) > 13 else None,
+                    'registration_date': row[14] if len(row) > 14 else None,
+                    'last_visit': row[15] if len(row) > 15 else None,
+                })
+            return patients
         except Exception as e:
             print(f"Error getting patients: {e}")
             return []
     
-    def delete_patient(self, patient_id):
-        """Delete a patient"""
+    def get_hospital_wards(self):
+        """Get all hospital wards"""
         try:
-            # Also delete related records
-            self.cursor.execute('DELETE FROM triage_queue WHERE patient_id = ?', (patient_id,))
-            self.cursor.execute('DELETE FROM appointments WHERE patient_id = ?', (patient_id,))
-            self.cursor.execute('DELETE FROM treatments WHERE patient_id = ?', (patient_id,))
-            self.cursor.execute('DELETE FROM bills WHERE patient_id = ?', (patient_id,))
-            self.cursor.execute('DELETE FROM patients WHERE patient_id = ?', (patient_id,))
+            self.cursor.execute('SELECT ward_id, name, level, capacity, hospital_id FROM wards ORDER BY ward_id')
+            rows = self.cursor.fetchall()
+            return [{
+                'ward_id': row[0],
+                'name': row[1],
+                'level': row[2],
+                'capacity': row[3],
+                'hospital_id': row[4]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting wards: {e}")
+            return []
+
+    def get_beds(self, ward_id=None):
+        """Get beds optionally filtered by ward"""
+        try:
+            if ward_id:
+                self.cursor.execute('SELECT bed_id, ward_id, room_number, status, patient_id FROM beds WHERE ward_id = ? ORDER BY bed_id', (ward_id,))
+            else:
+                self.cursor.execute('SELECT bed_id, ward_id, room_number, status, patient_id FROM beds ORDER BY bed_id')
+            rows = self.cursor.fetchall()
+            return [{
+                'bed_id': row[0],
+                'ward_id': row[1],
+                'room_number': row[2],
+                'status': row[3],
+                'patient_id': row[4]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting beds: {e}")
+            return []
+
+    def get_available_beds(self, ward_id=None):
+        """Get available beds for a ward or all wards"""
+        try:
+            if ward_id:
+                self.cursor.execute('SELECT bed_id, ward_id, room_number FROM beds WHERE status = "available" AND ward_id = ? ORDER BY bed_id', (ward_id,))
+            else:
+                self.cursor.execute('SELECT bed_id, ward_id, room_number FROM beds WHERE status = "available" ORDER BY ward_id, bed_id')
+            rows = self.cursor.fetchall()
+            return [{
+                'bed_id': row[0],
+                'ward_id': row[1],
+                'room_number': row[2]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting available beds: {e}")
+            return []
+
+    def admit_patient(self, patient_id, ward_id, bed_id, expected_discharge_date=None, notes=""):
+        """Admit a patient to a ward and bed."""
+        try:
+            self.cursor.execute('SELECT status FROM beds WHERE bed_id = ?', (bed_id,))
+            bed = self.cursor.fetchone()
+            if not bed or bed[0] != 'available':
+                return False, 'Selected bed is not available'
+
+            self.cursor.execute('''
+                INSERT INTO admissions (patient_id, ward_id, bed_id, admission_date, expected_discharge_date, status, notes)
+                VALUES (?, ?, ?, ?, ?, 'admitted', ?)
+            ''', (
+                patient_id,
+                ward_id,
+                bed_id,
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                expected_discharge_date,
+                notes
+            ))
+            self.cursor.execute('''
+                UPDATE beds SET status = 'occupied', patient_id = ? WHERE bed_id = ?
+            ''', (patient_id, bed_id))
+            self.connection.commit()
+            return True, 'Patient admitted successfully'
+        except Exception as e:
+            self.connection.rollback()
+            print(f"Error admitting patient: {e}")
+            return False, str(e)
+
+    def discharge_patient(self, admission_id):
+        """Discharge a patient and free up the bed."""
+        try:
+            self.cursor.execute('SELECT bed_id FROM admissions WHERE id = ? AND status = "admitted"', (admission_id,))
+            row = self.cursor.fetchone()
+            if not row:
+                return False
+            bed_id = row[0]
+            self.cursor.execute('''
+                UPDATE admissions
+                SET discharge_date = ?, status = 'discharged'
+                WHERE id = ?
+            ''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), admission_id))
+            self.cursor.execute('''
+                UPDATE beds SET status = 'available', patient_id = NULL WHERE bed_id = ?
+            ''', (bed_id,))
             self.connection.commit()
             return True
         except Exception as e:
-            print(f"Error deleting patient: {e}")
+            self.connection.rollback()
+            print(f"Error discharging patient: {e}")
             return False
 
-    def update_patient(self, patient_id, name, age, contact, blood_group, allergies):
+    def get_active_admissions(self):
+        """Get all active admissions."""
+        try:
+            self.cursor.execute('''
+                SELECT admissions.id, admissions.patient_id, patients.name, admissions.ward_id, admissions.bed_id,
+                       admissions.admission_date, admissions.expected_discharge_date, admissions.notes
+                FROM admissions
+                LEFT JOIN patients ON admissions.patient_id = patients.patient_id
+                WHERE admissions.status = 'admitted'
+                ORDER BY admissions.admission_date DESC
+            ''')
+            rows = self.cursor.fetchall()
+            return [{
+                'id': row[0],
+                'patient_id': row[1],
+                'patient_name': row[2],
+                'ward_id': row[3],
+                'bed_id': row[4],
+                'admission_date': row[5],
+                'expected_discharge_date': row[6],
+                'notes': row[7]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting admissions: {e}")
+            return []
+
+    def create_lab_order(self, patient_id, order_code, test_name, requested_by, status='requested'):
+        """Create a lab order."""
+        try:
+            self.cursor.execute('''
+                INSERT INTO lab_orders (patient_id, order_code, test_name, requested_by, status, ordered_date)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (patient_id, order_code, test_name, requested_by, status, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error creating lab order: {e}")
+            return False
+
+    def get_lab_orders(self, patient_id=None):
+        """Get lab orders, optionally for a patient."""
+        try:
+            if patient_id:
+                self.cursor.execute('SELECT id, patient_id, order_code, test_name, requested_by, status, ordered_date, result_text, result_date FROM lab_orders WHERE patient_id = ? ORDER BY ordered_date DESC', (patient_id,))
+            else:
+                self.cursor.execute('SELECT id, patient_id, order_code, test_name, requested_by, status, ordered_date, result_text, result_date FROM lab_orders ORDER BY ordered_date DESC')
+            rows = self.cursor.fetchall()
+            return [{
+                'id': row[0],
+                'patient_id': row[1],
+                'order_code': row[2],
+                'test_name': row[3],
+                'requested_by': row[4],
+                'status': row[5],
+                'ordered_date': row[6],
+                'result_text': row[7],
+                'result_date': row[8]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting lab orders: {e}")
+            return []
+
+    def save_medication(self, med_id, name, dosage_form, quantity, unit_price):
+        """Save or update medication stock."""
+        try:
+            self.cursor.execute('''
+                INSERT OR REPLACE INTO medication_inventory (med_id, name, dosage_form, quantity, unit_price, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (med_id, name, dosage_form, quantity, unit_price, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error saving medication: {e}")
+            return False
+
+    def get_medication_inventory(self):
+        """Get the medication inventory."""
+        try:
+            self.cursor.execute('SELECT med_id, name, dosage_form, quantity, unit_price, last_updated FROM medication_inventory ORDER BY name')
+            rows = self.cursor.fetchall()
+            return [{
+                'med_id': row[0],
+                'name': row[1],
+                'dosage_form': row[2],
+                'quantity': row[3],
+                'unit_price': row[4],
+                'last_updated': row[5]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting medication inventory: {e}")
+            return []
+
+    def submit_insurance_claim(self, patient_id, provider, policy_number, amount, notes=''):
+        """Submit an insurance claim."""
+        try:
+            self.cursor.execute('''
+                INSERT INTO insurance_claims (patient_id, provider, policy_number, claim_status, amount, submitted_date, notes)
+                VALUES (?, ?, ?, 'submitted', ?, ?, ?)
+            ''', (patient_id, provider, policy_number, amount, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), notes))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error submitting insurance claim: {e}")
+            return False
+
+    def get_insurance_claims(self, patient_id=None):
+        """Get insurance claims optionally for a patient."""
+        try:
+            if patient_id:
+                self.cursor.execute('SELECT id, patient_id, provider, policy_number, claim_status, amount, submitted_date, processed_date, notes FROM insurance_claims WHERE patient_id = ? ORDER BY submitted_date DESC', (patient_id,))
+            else:
+                self.cursor.execute('SELECT id, patient_id, provider, policy_number, claim_status, amount, submitted_date, processed_date, notes FROM insurance_claims ORDER BY submitted_date DESC')
+            rows = self.cursor.fetchall()
+            return [{
+                'id': row[0],
+                'patient_id': row[1],
+                'provider': row[2],
+                'policy_number': row[3],
+                'claim_status': row[4],
+                'amount': row[5],
+                'submitted_date': row[6],
+                'processed_date': row[7],
+                'notes': row[8]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting insurance claims: {e}")
+            return []
+
+    def save_document(self, patient_id, document_type, filename, file_path, description=''):
+        """Save metadata for a patient document."""
+        try:
+            self.cursor.execute('''
+                INSERT INTO documents (patient_id, document_type, filename, file_path, uploaded_date, description)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                patient_id,
+                document_type,
+                filename,
+                file_path,
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                description
+            ))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error saving document: {e}")
+            return False
+
+    def get_documents(self, patient_id=None):
+        """Get document metadata optionally filtered by patient."""
+        try:
+            if patient_id:
+                self.cursor.execute('SELECT id, patient_id, document_type, filename, file_path, uploaded_date, description FROM documents WHERE patient_id = ? ORDER BY uploaded_date DESC', (patient_id,))
+            else:
+                self.cursor.execute('SELECT id, patient_id, document_type, filename, file_path, uploaded_date, description FROM documents ORDER BY uploaded_date DESC')
+            rows = self.cursor.fetchall()
+            return [{
+                'id': row[0],
+                'patient_id': row[1],
+                'document_type': row[2],
+                'filename': row[3],
+                'file_path': row[4],
+                'uploaded_date': row[5],
+                'description': row[6]
+            } for row in rows]
+        except Exception as e:
+            print(f"Error getting documents: {e}")
+            return []
+
+    def get_patient_appointments(self, patient_id):
+        """Get all appointments for a patient"""
+        try:
+            self.cursor.execute('''
+                SELECT day, slot FROM appointments 
+                WHERE patient_id = ? AND status = 'scheduled'
+                ORDER BY day_index, slot_index
+            ''', (patient_id,))
+            return self.cursor.fetchall()
+        except Exception as e:
+            print(f"Error getting patient appointments: {e}")
+            return []
+
+    def update_patient(self, patient_id, name, age, contact, blood_group, allergies,
+                       medical_record_number=None, insurance_provider=None,
+                       policy_number=None, emergency_contact=None, primary_physician=None,
+                       next_of_kin=None, address=None, hospital_id=None):
         """Update an existing patient record"""
         try:
             self.cursor.execute('''
                 UPDATE patients
-                SET name = ?, age = ?, contact = ?, blood_group = ?, allergies = ?, last_visit = ?
+                SET name = ?, age = ?, contact = ?, blood_group = ?, allergies = ?,
+                    medical_record_number = ?, insurance_provider = ?, policy_number = ?,
+                    emergency_contact = ?, primary_physician = ?, next_of_kin = ?, address = ?,
+                    hospital_id = ?, last_visit = ?
                 WHERE patient_id = ?
             ''', (
                 name, age, contact, blood_group, allergies,
+                medical_record_number, insurance_provider, policy_number,
+                emergency_contact, primary_physician, next_of_kin, address,
+                hospital_id,
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 patient_id
             ))
@@ -844,3 +1340,14 @@ class HospitalDatabase:
     
     def close(self):
         """Close database connection"""
+        try:
+            if self.connection:
+                self.connection.commit()
+                self.connection.close()
+                self.connection = None
+                self.cursor = None
+                print("✅ Database connection closed")
+                return True
+        except Exception as e:
+            print(f"Error closing database: {e}")
+        return False

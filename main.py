@@ -647,6 +647,11 @@ class HospitalApp:
             'Appointments': self.appointment_tab,
             'Treatment History': self.treatment_tab,
             'Billing': self.billing_tab,
+            'Hospital Operations': self.hospital_tab,
+            'Lab Orders': self.lab_orders_tab,
+            'Pharmacy Inventory': self.inventory_tab,
+            'Insurance Claims': self.insurance_tab,
+            'Patient Documents': self.documents_tab,
             'Department Routing': self.routing_tab,
             'Search Patient': self.search_tab,
             'Settings': self.settings_tab,
@@ -660,11 +665,11 @@ class HospitalApp:
 
         role = self.current_user.get('role', 'Receptionist')
         allowed_tabs = {
-            'Admin': ['registration_tab', 'edit_patient_tab', 'patient_list_tab', 'doctor_tab', 'triage_tab', 'appointment_tab', 'treatment_tab', 'billing_tab', 'routing_tab', 'search_tab', 'settings_tab'],
-            'Doctor': ['patient_list_tab', 'doctor_tab', 'triage_tab', 'appointment_tab', 'treatment_tab', 'search_tab', 'settings_tab'],
-            'Nurse': ['patient_list_tab', 'triage_tab', 'appointment_tab', 'search_tab', 'settings_tab'],
-            'Receptionist': ['registration_tab', 'patient_list_tab', 'appointment_tab', 'search_tab', 'settings_tab'],
-            'Billing': ['patient_list_tab', 'billing_tab', 'search_tab', 'settings_tab']
+            'Admin': ['registration_tab', 'edit_patient_tab', 'patient_list_tab', 'doctor_tab', 'triage_tab', 'appointment_tab', 'treatment_tab', 'billing_tab', 'hospital_tab', 'lab_orders_tab', 'inventory_tab', 'insurance_tab', 'documents_tab', 'routing_tab', 'search_tab', 'settings_tab'],
+            'Doctor': ['patient_list_tab', 'doctor_tab', 'triage_tab', 'appointment_tab', 'treatment_tab', 'hospital_tab', 'lab_orders_tab', 'documents_tab', 'search_tab', 'settings_tab'],
+            'Nurse': ['patient_list_tab', 'triage_tab', 'appointment_tab', 'hospital_tab', 'lab_orders_tab', 'inventory_tab', 'documents_tab', 'search_tab', 'settings_tab'],
+            'Receptionist': ['registration_tab', 'patient_list_tab', 'appointment_tab', 'hospital_tab', 'insurance_tab', 'documents_tab', 'search_tab', 'settings_tab'],
+            'Billing': ['patient_list_tab', 'billing_tab', 'hospital_tab', 'insurance_tab', 'documents_tab', 'search_tab', 'settings_tab']
         }.get(role, ['registration_tab', 'patient_list_tab', 'search_tab', 'settings_tab'])
 
         tabs = {
@@ -676,6 +681,11 @@ class HospitalApp:
             'appointment_tab': self.appointment_tab,
             'treatment_tab': self.treatment_tab,
             'billing_tab': self.billing_tab,
+            'hospital_tab': self.hospital_tab,
+            'lab_orders_tab': self.lab_orders_tab,
+            'inventory_tab': self.inventory_tab,
+            'insurance_tab': self.insurance_tab,
+            'documents_tab': self.documents_tab,
             'routing_tab': self.routing_tab,
             'search_tab': self.search_tab,
             'settings_tab': self.settings_tab,
@@ -1263,7 +1273,7 @@ class HospitalApp:
     
     def show_db_info(self):
         """Show database information"""
-        info_text = "📁 DATABASE INFORMATION\n\nDatabase File: medistruct.db\nType: SQLite (Serverless)\n\nTables Created:\n✓ patients\n✓ triage_queue\n✓ appointments\n✓ treatments\n✓ doctors\n✓ bills\n✓ system_settings\n\nFeatures:\n✓ Auto-save on close\n✓ Data persists after PC restart\n✓ Multi-user ready\n✓ Backup capability"
+        info_text = "📁 DATABASE INFORMATION\n\nDatabase File: medistruct.db\nType: SQLite (Serverless)\n\nTables Created:\n✓ patients\n✓ triage_queue\n✓ appointments\n✓ treatments\n✓ doctors\n✓ bills\n✓ system_settings\n✓ hospitals\n✓ wards\n✓ beds\n✓ admissions\n✓ lab_orders\n✓ medication_inventory\n✓ insurance_claims\n✓ documents\n\nFeatures:\n✓ Auto-save on close\n✓ Data persists after PC restart\n✓ Multi-user ready\n✓ Backup capability\n✓ Ward/bed/admission management\n✓ Hospital operations support"
         
         SilentMessageBox.show_info("Database Information", info_text, self.root)
     
@@ -1293,6 +1303,11 @@ class HospitalApp:
         self.create_appointment_tab()
         self.create_treatment_tab()
         self.create_billing_tab()
+        self.create_hospital_operations_tab()
+        self.create_lab_orders_tab()
+        self.create_inventory_tab()
+        self.create_insurance_tab()
+        self.create_documents_tab()
         self.create_routing_tab()
         self.create_search_tab()
         self.create_settings_tab()
@@ -1718,6 +1733,664 @@ class HospitalApp:
         self.update_billing_display()
         self.update_billing_patient_dropdown()
     
+    def create_hospital_operations_tab(self):
+        """Ward, bed, and admission management for hospital-scale support."""
+        self.hospital_tab = tk.Frame(self.notebook, bg=COLORS['light_bg'])
+        self.notebook.add(self.hospital_tab, text="🏥 Hospital Operations")
+
+        left_frame = tk.Frame(self.hospital_tab, bg=COLORS['light_bg'])
+        left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        right_frame = tk.Frame(self.hospital_tab, bg=COLORS['light_bg'])
+        right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
+
+        form_card = tk.Frame(left_frame, bg='#eef6fb', relief='flat', bd=1)
+        form_card.pack(fill='both', expand=True, padx=10, pady=10)
+
+        banner = tk.Frame(form_card, bg=COLORS['primary'], height=90)
+        banner.pack(fill='x')
+        banner.pack_propagate(False)
+        tk.Label(banner, text="🏥", font=('Segoe UI', 28), bg=COLORS['primary'], fg='white').pack(side='left', padx=(18, 10), pady=18)
+        banner_text = tk.Frame(banner, bg=COLORS['primary'])
+        banner_text.pack(side='left', pady=18)
+        tk.Label(banner_text, text="HOSPITAL OPERATIONS", font=('Segoe UI', 16, 'bold'),
+                 bg=COLORS['primary'], fg='white').pack(anchor='w')
+        tk.Label(banner_text, text="Manage wards, beds, and admissions for larger facilities.",
+                 font=('Segoe UI', 10), bg=COLORS['primary'], fg='#dbeef8').pack(anchor='w', pady=(3, 0))
+
+        form = tk.Frame(form_card, bg='white')
+        form.pack(fill='both', expand=True, padx=18, pady=18)
+        form.grid_columnconfigure(1, weight=1)
+
+        tk.Label(form, text="🔎 Patient", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=0, column=0, sticky='w', padx=8, pady=8)
+        self.hospital_patient_var = tk.StringVar()
+        self.hospital_patient_combo = ttk.Combobox(
+            form,
+            textvariable=self.hospital_patient_var,
+            width=28,
+            font=('Segoe UI', 11),
+            state='normal',
+            postcommand=self.update_hospital_patient_dropdown
+        )
+        self.hospital_patient_combo.grid(row=0, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="🏷️ Ward", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=1, column=0, sticky='w', padx=8, pady=8)
+        self.ward_var = tk.StringVar()
+        self.ward_combo = ttk.Combobox(form, textvariable=self.ward_var,
+                                       font=('Segoe UI', 11), state='readonly')
+        self.ward_combo.grid(row=1, column=1, padx=8, pady=8, sticky='ew')
+        self.ward_combo.bind('<<ComboboxSelected>>', lambda _: self.update_hospital_bed_dropdown())
+
+        tk.Label(form, text="🛏 Bed", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=2, column=0, sticky='w', padx=8, pady=8)
+        self.bed_var = tk.StringVar()
+        self.bed_combo = ttk.Combobox(form, textvariable=self.bed_var, font=('Segoe UI', 11), state='readonly')
+        self.bed_combo.grid(row=2, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="📅 Expected Discharge", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=3, column=0, sticky='w', padx=8, pady=8)
+        self.expected_discharge_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.expected_discharge_entry.grid(row=3, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="📝 Notes", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=4, column=0, sticky='nw', padx=8, pady=8)
+        self.hospital_notes_text = tk.Text(form, height=5, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd', wrap='word')
+        self.hospital_notes_text.grid(row=4, column=1, padx=8, pady=8, sticky='ew')
+
+        button_frame = tk.Frame(form_card, bg='white')
+        button_frame.pack(fill='x', padx=18, pady=(0, 18))
+        ModernButton(button_frame, text="➕ Admit Patient", command=self.admit_patient_to_bed, color='secondary').pack(side='left', padx=6)
+        ModernButton(button_frame, text="🔄 Refresh", command=self.load_hospital_operations_data, color='info').pack(side='left', padx=6)
+
+        list_card = tk.Frame(right_frame, bg='#eef6fb', relief='flat', bd=1)
+        list_card.pack(fill='both', expand=True, padx=10, pady=10)
+
+        admission_banner = tk.Frame(list_card, bg=COLORS['warning'], height=88)
+        admission_banner.pack(fill='x')
+        admission_banner.pack_propagate(False)
+        tk.Label(admission_banner, text="📄", font=('Segoe UI', 26), bg=COLORS['warning'], fg='white').pack(side='left', padx=(18, 10), pady=18)
+        admission_banner_text = tk.Frame(admission_banner, bg=COLORS['warning'])
+        admission_banner_text.pack(side='left', pady=18)
+        tk.Label(admission_banner_text, text="ACTIVE ADMISSIONS", font=('Segoe UI', 16, 'bold'),
+                 bg=COLORS['warning'], fg='white').pack(anchor='w')
+        tk.Label(admission_banner_text, text="Monitor which patients occupy beds and discharge them cleanly.",
+                 font=('Segoe UI', 10), bg=COLORS['warning'], fg='#fff3d8').pack(anchor='w', pady=(3, 0))
+
+        self.admission_listbox = tk.Listbox(list_card, font=('Segoe UI', 10), bg='#f8fbfd', fg=COLORS['text'],
+                                            selectbackground=COLORS['primary'], selectforeground='white', activestyle='none')
+        self.admission_listbox.pack(fill='both', expand=True, padx=16, pady=16)
+        self.admission_listbox.bind('<<ListboxSelect>>', self.on_admission_select)
+
+        admit_actions = tk.Frame(list_card, bg='#eef6fb')
+        admit_actions.pack(fill='x', padx=16, pady=(0, 16))
+        ModernButton(admit_actions, text="✅ Discharge Selected", command=self.discharge_selected_admission, color='danger').pack(side='left', padx=6)
+        ModernButton(admit_actions, text="📊 Refresh Status", command=self.load_hospital_operations_data, color='gray').pack(side='left', padx=6)
+
+        self.bed_status_label = tk.Label(list_card, text="Beds and occupancy will appear after refresh.",
+                                         bg='#eef6fb', fg=COLORS['text'], font=('Segoe UI', 10), wraplength=300, justify='left')
+        self.bed_status_label.pack(fill='x', padx=16, pady=(0, 12))
+
+        self.load_hospital_operations_data()
+
+    def admit_patient_to_bed(self):
+        patient_value = self.hospital_patient_var.get().strip()
+        if ' - ' in patient_value:
+            patient_id = patient_value.split(' - ', 1)[0].upper()
+        else:
+            patient_id = patient_value.upper()
+
+        ward_id = self.ward_var.get().strip()
+        if ' - ' in ward_id:
+            ward_id = ward_id.split(' - ', 1)[0]
+
+        bed_id = self.bed_var.get().strip()
+        if ' ' in bed_id:
+            bed_id = bed_id.split(' ', 1)[0]
+
+        expected_discharge = self.expected_discharge_entry.get().strip() or None
+        notes = self.hospital_notes_text.get('1.0', tk.END).strip()
+
+        if not patient_id or not ward_id or not bed_id:
+            SilentMessageBox.show_error('Admission Error', 'Please select a patient, ward, and available bed.', self.root)
+            return
+
+        success, message = self.db.admit_patient(patient_id, ward_id, bed_id, expected_discharge, notes)
+        if success:
+            self.load_hospital_operations_data()
+            SilentMessageBox.show_info('Admission Complete', message, self.root)
+            self.update_status(f'Admitted {patient_id} to {bed_id}')
+        else:
+            SilentMessageBox.show_error('Admission Failed', message, self.root)
+            self.update_status(f'Admission failed: {message}')
+
+    def discharge_selected_admission(self):
+        selection = self.admission_listbox.curselection()
+        if not selection:
+            SilentMessageBox.show_error('Selection Required', 'Select an admission from the list before discharging.', self.root)
+            return
+
+        admission_line = self.admission_listbox.get(selection[0])
+        admission_id = admission_line.split(':', 1)[0]
+        if admission_id.isdigit() and self.db.discharge_patient(int(admission_id)):
+            self.load_hospital_operations_data()
+            SilentMessageBox.show_info('Discharged', 'Patient has been discharged and bed is now available.', self.root)
+            self.update_status('Patient discharged successfully')
+        else:
+            SilentMessageBox.show_error('Discharge Failed', 'Unable to discharge the selected admission.', self.root)
+
+    def load_hospital_operations_data(self):
+        wards = self.db.get_hospital_wards()
+        ward_values = [f"{ward['ward_id']} - {ward['name']}" for ward in wards]
+        self.ward_combo['values'] = ward_values
+        if ward_values and not self.ward_var.get():
+            self.ward_var.set(ward_values[0])
+
+        self.update_hospital_patient_dropdown()
+        self.update_hospital_bed_dropdown()
+
+        active = self.db.get_active_admissions()
+        self.admission_listbox.delete(0, tk.END)
+        for item in active:
+            self.admission_listbox.insert(tk.END, f"{item['id']}: {item['patient_id']} - {item['patient_name']} | {item['ward_id']}/{item['bed_id']} ({item['admission_date']})")
+
+        beds = self.db.get_beds()
+        total = len(beds)
+        occupied = len([b for b in beds if b['status'] == 'occupied'])
+        available = len([b for b in beds if b['status'] == 'available'])
+        self.bed_status_label.config(text=f"Beds: {total} total · {available} available · {occupied} occupied")
+
+    def update_hospital_bed_dropdown(self):
+        ward_id = self.ward_var.get().strip()
+        if ' - ' in ward_id:
+            ward_id = ward_id.split(' - ', 1)[0]
+        available = self.db.get_available_beds(ward_id if ward_id else None)
+        self.bed_combo['values'] = [f"{bed['bed_id']} ({bed['room_number']})" for bed in available]
+        if available:
+            self.bed_var.set(f"{available[0]['bed_id']} ({available[0]['room_number']})")
+
+    def update_hospital_patient_dropdown(self, patients=None):
+        self.hospital_patient_combo['values'] = self.get_patient_dropdown_values(patients)
+
+    def create_lab_orders_tab(self):
+        """Laboratory order creation, tracking, and status review."""
+        self.lab_orders_tab = tk.Frame(self.notebook, bg=COLORS['light_bg'])
+        self.notebook.add(self.lab_orders_tab, text="🧪 Lab Orders")
+
+        left_frame = tk.Frame(self.lab_orders_tab, bg=COLORS['light_bg'])
+        left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        right_frame = tk.Frame(self.lab_orders_tab, bg=COLORS['light_bg'])
+        right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
+
+        form_card = tk.Frame(left_frame, bg='#eef6fb', relief='flat', bd=1)
+        form_card.pack(fill='both', expand=True, padx=10, pady=10)
+        banner = tk.Frame(form_card, bg=COLORS['info'], height=90)
+        banner.pack(fill='x')
+        banner.pack_propagate(False)
+        tk.Label(banner, text="🧪", font=('Segoe UI', 28), bg=COLORS['info'], fg='white').pack(side='left', padx=(18, 10), pady=18)
+        banner_text = tk.Frame(banner, bg=COLORS['info'])
+        banner_text.pack(side='left', pady=18)
+        tk.Label(banner_text, text="LAB ORDERS", font=('Segoe UI', 16, 'bold'),
+                 bg=COLORS['info'], fg='white').pack(anchor='w')
+        tk.Label(banner_text, text="Request tests and monitor laboratory workflow across patients.",
+                 font=('Segoe UI', 10), bg=COLORS['info'], fg='#d8eef8').pack(anchor='w', pady=(3, 0))
+
+        form = tk.Frame(form_card, bg='white')
+        form.pack(fill='both', expand=True, padx=18, pady=18)
+        form.grid_columnconfigure(1, weight=1)
+
+        tk.Label(form, text="🔎 Patient", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=0, column=0, sticky='w', padx=8, pady=8)
+        self.lab_order_patient_var = tk.StringVar()
+        self.lab_order_patient_combo = ttk.Combobox(form, textvariable=self.lab_order_patient_var,
+                                                   font=('Segoe UI', 11), state='normal', postcommand=self.update_lab_order_patient_dropdown)
+        self.lab_order_patient_combo.grid(row=0, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="🧾 Order Code", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=1, column=0, sticky='w', padx=8, pady=8)
+        self.lab_order_code_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.lab_order_code_entry.grid(row=1, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="🧬 Test Name", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=2, column=0, sticky='w', padx=8, pady=8)
+        self.lab_order_test_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.lab_order_test_entry.grid(row=2, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="👩‍⚕️ Requested By", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=3, column=0, sticky='w', padx=8, pady=8)
+        self.lab_order_requested_by_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.lab_order_requested_by_entry.grid(row=3, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="📋 Result Notes", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=4, column=0, sticky='nw', padx=8, pady=8)
+        self.lab_order_results_text = tk.Text(form, height=5, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd', wrap='word')
+        self.lab_order_results_text.grid(row=4, column=1, padx=8, pady=8, sticky='ew')
+
+        button_frame = tk.Frame(form_card, bg='white')
+        button_frame.pack(fill='x', padx=18, pady=(0, 18))
+        ModernButton(button_frame, text="➕ Request Lab Order", command=self.submit_lab_order, color='secondary').pack(side='left', padx=6)
+        ModernButton(button_frame, text="🔄 Refresh", command=self.load_lab_orders_data, color='info').pack(side='left', padx=6)
+
+        list_card = tk.Frame(right_frame, bg='#eef6fb', relief='flat', bd=1)
+        list_card.pack(fill='both', expand=True, padx=10, pady=10)
+        top = tk.Frame(list_card, bg='#eef6fb')
+        top.pack(fill='x', padx=16, pady=(16, 10))
+        tk.Label(top, text="LAB ORDER REGISTER", font=('Segoe UI', 16, 'bold'), bg='#eef6fb', fg=COLORS['primary']).pack(side='left')
+        self.lab_order_filter_entry = tk.Entry(top, width=24, font=('Segoe UI', 10), relief='solid', bd=1, bg='white')
+        self.lab_order_filter_entry.pack(side='left', padx=10)
+        ModernButton(top, text="Search", command=self.search_lab_orders, color='info').pack(side='left', padx=4)
+        ModernButton(top, text="Show All", command=self.load_lab_orders_data, color='secondary').pack(side='left', padx=4)
+
+        self.lab_order_tree = ttk.Treeview(list_card, columns=('id', 'patient', 'code', 'test', 'requested_by', 'status', 'ordered_date', 'result_date'), show='headings', height=14)
+        self.lab_order_tree.heading('id', text='ID')
+        self.lab_order_tree.heading('patient', text='Patient')
+        self.lab_order_tree.heading('code', text='Code')
+        self.lab_order_tree.heading('test', text='Test')
+        self.lab_order_tree.heading('requested_by', text='Requested By')
+        self.lab_order_tree.heading('status', text='Status')
+        self.lab_order_tree.heading('ordered_date', text='Ordered Date')
+        self.lab_order_tree.heading('result_date', text='Result Date')
+        self.lab_order_tree.column('id', width=40, anchor='center')
+        self.lab_order_tree.column('patient', width=120)
+        self.lab_order_tree.column('code', width=80)
+        self.lab_order_tree.column('test', width=140)
+        self.lab_order_tree.column('requested_by', width=110)
+        self.lab_order_tree.column('status', width=95, anchor='center')
+        self.lab_order_tree.column('ordered_date', width=120, anchor='center')
+        self.lab_order_tree.column('result_date', width=120, anchor='center')
+        self.lab_order_tree.pack(fill='both', expand=True, padx=16, pady=(0, 16))
+
+        self.update_lab_order_patient_dropdown()
+        self.load_lab_orders_data()
+
+    def load_lab_orders_data(self, patient_id=None):
+        if patient_id:
+            orders = self.db.get_lab_orders(patient_id)
+        else:
+            filter_term = self.lab_order_filter_entry.get().strip() if hasattr(self, 'lab_order_filter_entry') else ''
+            orders = self.db.get_lab_orders()
+            if filter_term:
+                orders = [order for order in orders if filter_term.lower() in order['patient_id'].lower() or filter_term.lower() in order['test_name'].lower() or filter_term.lower() in order['order_code'].lower()]
+
+        self.lab_order_tree.delete(*self.lab_order_tree.get_children())
+        for order in orders:
+            self.lab_order_tree.insert('', tk.END, values=(order['id'], order['patient_id'], order['order_code'], order['test_name'], order['requested_by'], order['status'], order['ordered_date'], order['result_date'] or ''))
+
+    def submit_lab_order(self):
+        patient_value = self.lab_order_patient_var.get().strip()
+        patient_id = patient_value.split(' - ', 1)[0].upper() if ' - ' in patient_value else patient_value.upper()
+        order_code = self.lab_order_code_entry.get().strip() or f"LAB-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        test_name = self.lab_order_test_entry.get().strip()
+        requested_by = self.lab_order_requested_by_entry.get().strip() or (self.current_user.get('display_name') if self.current_user else 'Staff')
+
+        if not patient_id or not test_name:
+            SilentMessageBox.show_error('Lab Order Error', 'Please select a patient and enter the test name.', self.root)
+            return
+
+        if self.db.create_lab_order(patient_id, order_code, test_name, requested_by):
+            self.load_lab_orders_data()
+            SilentMessageBox.show_info('Lab Order Submitted', 'The lab order was created successfully.', self.root)
+            self.update_status(f'Lab order created for {patient_id}')
+        else:
+            SilentMessageBox.show_error('Submission Failed', 'Unable to create the lab order.', self.root)
+
+    def search_lab_orders(self):
+        self.load_lab_orders_data()
+
+    def update_lab_order_patient_dropdown(self, patients=None):
+        self.lab_order_patient_combo['values'] = self.get_patient_dropdown_values(patients)
+
+    def create_inventory_tab(self):
+        """Medication inventory management for clinics and hospitals."""
+        self.inventory_tab = tk.Frame(self.notebook, bg=COLORS['light_bg'])
+        self.notebook.add(self.inventory_tab, text="💊 Pharmacy Inventory")
+
+        left_frame = tk.Frame(self.inventory_tab, bg=COLORS['light_bg'])
+        left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        right_frame = tk.Frame(self.inventory_tab, bg=COLORS['light_bg'])
+        right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
+
+        form_card = tk.Frame(left_frame, bg='#eef6fb', relief='flat', bd=1)
+        form_card.pack(fill='both', expand=True, padx=10, pady=10)
+        banner = tk.Frame(form_card, bg=COLORS['secondary_dark'], height=90)
+        banner.pack(fill='x')
+        banner.pack_propagate(False)
+        tk.Label(banner, text="💊", font=('Segoe UI', 28), bg=COLORS['secondary_dark'], fg='white').pack(side='left', padx=(18, 10), pady=18)
+        banner_text = tk.Frame(banner, bg=COLORS['secondary_dark'])
+        banner_text.pack(side='left', pady=18)
+        tk.Label(banner_text, text="PHARMACY INVENTORY", font=('Segoe UI', 16, 'bold'),
+                 bg=COLORS['secondary_dark'], fg='white').pack(anchor='w')
+        tk.Label(banner_text, text="Track medicine stock, price, and reorder levels.",
+                 font=('Segoe UI', 10), bg=COLORS['secondary_dark'], fg='#d8f7e6').pack(anchor='w', pady=(3, 0))
+
+        form = tk.Frame(form_card, bg='white')
+        form.pack(fill='both', expand=True, padx=18, pady=18)
+        form.grid_columnconfigure(1, weight=1)
+
+        tk.Label(form, text="🆔 Medication ID", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=0, column=0, sticky='w', padx=8, pady=8)
+        self.med_id_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.med_id_entry.grid(row=0, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="📛 Name", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=1, column=0, sticky='w', padx=8, pady=8)
+        self.med_name_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.med_name_entry.grid(row=1, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="💊 Dosage", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=2, column=0, sticky='w', padx=8, pady=8)
+        self.med_dosage_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.med_dosage_entry.grid(row=2, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="📦 Quantity", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=3, column=0, sticky='w', padx=8, pady=8)
+        self.med_quantity_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.med_quantity_entry.grid(row=3, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="💲 Unit Price", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=4, column=0, sticky='w', padx=8, pady=8)
+        self.med_price_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.med_price_entry.grid(row=4, column=1, padx=8, pady=8, sticky='ew')
+
+        button_frame = tk.Frame(form_card, bg='white')
+        button_frame.pack(fill='x', padx=18, pady=(0, 18))
+        ModernButton(button_frame, text="💾 Save Medication", command=self.save_medication_inventory_record, color='secondary').pack(side='left', padx=6)
+        ModernButton(button_frame, text="🔄 Refresh", command=self.load_medication_inventory, color='info').pack(side='left', padx=6)
+
+        list_card = tk.Frame(right_frame, bg='#eef6fb', relief='flat', bd=1)
+        list_card.pack(fill='both', expand=True, padx=10, pady=10)
+        top = tk.Frame(list_card, bg='#eef6fb')
+        top.pack(fill='x', padx=16, pady=(16, 10))
+        tk.Label(top, text="MEDICATION INVENTORY", font=('Segoe UI', 16, 'bold'), bg='#eef6fb', fg=COLORS['primary']).pack(side='left')
+        ModernButton(top, text="Show All", command=self.load_medication_inventory, color='secondary').pack(side='left', padx=4)
+
+        self.med_inventory_tree = ttk.Treeview(list_card, columns=('med_id', 'name', 'dosage_form', 'quantity', 'unit_price', 'updated'), show='headings', height=16)
+        self.med_inventory_tree.heading('med_id', text='ID')
+        self.med_inventory_tree.heading('name', text='Name')
+        self.med_inventory_tree.heading('dosage_form', text='Dosage Form')
+        self.med_inventory_tree.heading('quantity', text='Qty')
+        self.med_inventory_tree.heading('unit_price', text='Unit Price')
+        self.med_inventory_tree.heading('updated', text='Last Updated')
+        self.med_inventory_tree.column('med_id', width=70, anchor='center')
+        self.med_inventory_tree.column('name', width=140)
+        self.med_inventory_tree.column('dosage_form', width=100)
+        self.med_inventory_tree.column('quantity', width=70, anchor='center')
+        self.med_inventory_tree.column('unit_price', width=90, anchor='center')
+        self.med_inventory_tree.column('updated', width=130, anchor='center')
+        self.med_inventory_tree.pack(fill='both', expand=True, padx=16, pady=(0, 16))
+
+        self.load_medication_inventory()
+
+    def load_medication_inventory(self):
+        inventory = self.db.get_medication_inventory()
+        self.med_inventory_tree.delete(*self.med_inventory_tree.get_children())
+        for med in inventory:
+            self.med_inventory_tree.insert('', tk.END, values=(med['med_id'], med['name'], med['dosage_form'], med['quantity'], f"{med['unit_price']:.2f}", med['last_updated'] or ''))
+
+    def save_medication_inventory_record(self):
+        med_id = self.med_id_entry.get().strip().upper()
+        name = self.med_name_entry.get().strip()
+        dosage = self.med_dosage_entry.get().strip()
+        quantity = self.med_quantity_entry.get().strip()
+        unit_price = self.med_price_entry.get().strip()
+
+        if not med_id or not name:
+            SilentMessageBox.show_error('Inventory Error', 'Medication ID and name are required.', self.root)
+            return
+
+        try:
+            quantity_val = int(quantity)
+            price_val = float(unit_price or 0)
+        except ValueError:
+            SilentMessageBox.show_error('Inventory Error', 'Quantity must be an integer and price must be numeric.', self.root)
+            return
+
+        if self.db.save_medication(med_id, name, dosage, quantity_val, price_val):
+            self.load_medication_inventory()
+            SilentMessageBox.show_info('Inventory Saved', 'Medication inventory has been updated.', self.root)
+            self.update_status(f'Saved medication {med_id}')
+        else:
+            SilentMessageBox.show_error('Save Failed', 'Unable to save medication inventory.', self.root)
+
+    def create_insurance_tab(self):
+        """Insurance claim submission and review panel."""
+        self.insurance_tab = tk.Frame(self.notebook, bg=COLORS['light_bg'])
+        self.notebook.add(self.insurance_tab, text="💼 Insurance Claims")
+
+        left_frame = tk.Frame(self.insurance_tab, bg=COLORS['light_bg'])
+        left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        right_frame = tk.Frame(self.insurance_tab, bg=COLORS['light_bg'])
+        right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
+
+        form_card = tk.Frame(left_frame, bg='#eef6fb', relief='flat', bd=1)
+        form_card.pack(fill='both', expand=True, padx=10, pady=10)
+        banner = tk.Frame(form_card, bg=COLORS['warning'], height=90)
+        banner.pack(fill='x')
+        banner.pack_propagate(False)
+        tk.Label(banner, text="💼", font=('Segoe UI', 28), bg=COLORS['warning'], fg='white').pack(side='left', padx=(18, 10), pady=18)
+        banner_text = tk.Frame(banner, bg=COLORS['warning'])
+        banner_text.pack(side='left', pady=18)
+        tk.Label(banner_text, text="INSURANCE CLAIMS", font=('Segoe UI', 16, 'bold'),
+                 bg=COLORS['warning'], fg='white').pack(anchor='w')
+        tk.Label(banner_text, text="Submit and review patient claims from the front desk or billing team.",
+                 font=('Segoe UI', 10), bg=COLORS['warning'], fg='#fff3d8').pack(anchor='w', pady=(3, 0))
+
+        form = tk.Frame(form_card, bg='white')
+        form.pack(fill='both', expand=True, padx=18, pady=18)
+        form.grid_columnconfigure(1, weight=1)
+
+        tk.Label(form, text="🔎 Patient", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=0, column=0, sticky='w', padx=8, pady=8)
+        self.claim_patient_var = tk.StringVar()
+        self.claim_patient_combo = ttk.Combobox(form, textvariable=self.claim_patient_var,
+                                               font=('Segoe UI', 11), state='normal', postcommand=self.update_claim_patient_dropdown)
+        self.claim_patient_combo.grid(row=0, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="🏢 Provider", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=1, column=0, sticky='w', padx=8, pady=8)
+        self.claim_provider_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.claim_provider_entry.grid(row=1, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="📝 Policy Number", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=2, column=0, sticky='w', padx=8, pady=8)
+        self.claim_policy_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.claim_policy_entry.grid(row=2, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="💰 Amount", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=3, column=0, sticky='w', padx=8, pady=8)
+        self.claim_amount_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.claim_amount_entry.grid(row=3, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="📝 Notes", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=4, column=0, sticky='nw', padx=8, pady=8)
+        self.claim_notes_text = tk.Text(form, height=5, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd', wrap='word')
+        self.claim_notes_text.grid(row=4, column=1, padx=8, pady=8, sticky='ew')
+
+        button_frame = tk.Frame(form_card, bg='white')
+        button_frame.pack(fill='x', padx=18, pady=(0, 18))
+        ModernButton(button_frame, text="➕ Submit Claim", command=self.submit_insurance_claim, color='secondary').pack(side='left', padx=6)
+        ModernButton(button_frame, text="🔄 Refresh", command=self.load_insurance_claims_data, color='info').pack(side='left', padx=6)
+
+        list_card = tk.Frame(right_frame, bg='#eef6fb', relief='flat', bd=1)
+        list_card.pack(fill='both', expand=True, padx=10, pady=10)
+        top = tk.Frame(list_card, bg='#eef6fb')
+        top.pack(fill='x', padx=16, pady=(16, 10))
+        tk.Label(top, text="INSURANCE CLAIMS", font=('Segoe UI', 16, 'bold'), bg='#eef6fb', fg=COLORS['primary']).pack(side='left')
+        ModernButton(top, text="Show All", command=self.load_insurance_claims_data, color='secondary').pack(side='left', padx=4)
+
+        self.insurance_tree = ttk.Treeview(list_card, columns=('id', 'patient', 'provider', 'policy', 'status', 'amount', 'submitted', 'processed'), show='headings', height=16)
+        self.insurance_tree.heading('id', text='ID')
+        self.insurance_tree.heading('patient', text='Patient')
+        self.insurance_tree.heading('provider', text='Provider')
+        self.insurance_tree.heading('policy', text='Policy Number')
+        self.insurance_tree.heading('status', text='Status')
+        self.insurance_tree.heading('amount', text='Amount')
+        self.insurance_tree.heading('submitted', text='Submitted')
+        self.insurance_tree.heading('processed', text='Processed')
+        self.insurance_tree.column('id', width=40, anchor='center')
+        self.insurance_tree.column('patient', width=110)
+        self.insurance_tree.column('provider', width=110)
+        self.insurance_tree.column('policy', width=120)
+        self.insurance_tree.column('status', width=90, anchor='center')
+        self.insurance_tree.column('amount', width=80, anchor='center')
+        self.insurance_tree.column('submitted', width=120, anchor='center')
+        self.insurance_tree.column('processed', width=120, anchor='center')
+        self.insurance_tree.pack(fill='both', expand=True, padx=16, pady=(0, 16))
+
+        self.update_claim_patient_dropdown()
+        self.load_insurance_claims_data()
+
+    def load_insurance_claims_data(self, patient_id=None):
+        claims = self.db.get_insurance_claims(patient_id) if patient_id else self.db.get_insurance_claims()
+        self.insurance_tree.delete(*self.insurance_tree.get_children())
+        for claim in claims:
+            self.insurance_tree.insert('', tk.END, values=(claim['id'], claim['patient_id'], claim['provider'], claim['policy_number'], claim['claim_status'], f"{claim['amount']:.2f}", claim['submitted_date'], claim['processed_date'] or ''))
+
+    def submit_insurance_claim(self):
+        patient_value = self.claim_patient_var.get().strip()
+        patient_id = patient_value.split(' - ', 1)[0].upper() if ' - ' in patient_value else patient_value.upper()
+        provider = self.claim_provider_entry.get().strip()
+        policy = self.claim_policy_entry.get().strip()
+        amount = self.claim_amount_entry.get().strip()
+        notes = self.claim_notes_text.get('1.0', tk.END).strip()
+
+        if not patient_id or not provider or not policy or not amount:
+            SilentMessageBox.show_error('Claim Error', 'Please complete the patient, provider, policy, and amount fields.', self.root)
+            return
+
+        try:
+            amount_val = float(amount)
+        except ValueError:
+            SilentMessageBox.show_error('Claim Error', 'Amount must be a valid number.', self.root)
+            return
+
+        if self.db.submit_insurance_claim(patient_id, provider, policy, amount_val, notes):
+            self.load_insurance_claims_data()
+            SilentMessageBox.show_info('Claim Submitted', 'Insurance claim submitted successfully.', self.root)
+            self.update_status(f'Insurance claim submitted for {patient_id}')
+        else:
+            SilentMessageBox.show_error('Submit Failed', 'Unable to submit insurance claim.', self.root)
+
+    def update_claim_patient_dropdown(self, patients=None):
+        self.claim_patient_combo['values'] = self.get_patient_dropdown_values(patients)
+
+    def create_documents_tab(self):
+        """Patient documents and file metadata management."""
+        self.documents_tab = tk.Frame(self.notebook, bg=COLORS['light_bg'])
+        self.notebook.add(self.documents_tab, text="📁 Patient Documents")
+
+        left_frame = tk.Frame(self.documents_tab, bg=COLORS['light_bg'])
+        left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        right_frame = tk.Frame(self.documents_tab, bg=COLORS['light_bg'])
+        right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
+
+        form_card = tk.Frame(left_frame, bg='#eef6fb', relief='flat', bd=1)
+        form_card.pack(fill='both', expand=True, padx=10, pady=10)
+        banner = tk.Frame(form_card, bg=COLORS['gray_dark'], height=90)
+        banner.pack(fill='x')
+        banner.pack_propagate(False)
+        tk.Label(banner, text="📁", font=('Segoe UI', 28), bg=COLORS['gray_dark'], fg='white').pack(side='left', padx=(18, 10), pady=18)
+        banner_text = tk.Frame(banner, bg=COLORS['gray_dark'])
+        banner_text.pack(side='left', pady=18)
+        tk.Label(banner_text, text="PATIENT DOCUMENTS", font=('Segoe UI', 16, 'bold'),
+                 bg=COLORS['gray_dark'], fg='white').pack(anchor='w')
+        tk.Label(banner_text, text="Store document metadata and quickly open patient files.",
+                 font=('Segoe UI', 10), bg=COLORS['gray_dark'], fg='#dfe2e8').pack(anchor='w', pady=(3, 0))
+
+        form = tk.Frame(form_card, bg='white')
+        form.pack(fill='both', expand=True, padx=18, pady=18)
+        form.grid_columnconfigure(1, weight=1)
+
+        tk.Label(form, text="🔎 Patient", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=0, column=0, sticky='w', padx=8, pady=8)
+        self.document_patient_var = tk.StringVar()
+        self.document_patient_combo = ttk.Combobox(form, textvariable=self.document_patient_var,
+                                                   font=('Segoe UI', 11), state='normal', postcommand=self.update_document_patient_dropdown)
+        self.document_patient_combo.grid(row=0, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="📄 Document Type", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=1, column=0, sticky='w', padx=8, pady=8)
+        self.document_type_entry = tk.Entry(form, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.document_type_entry.grid(row=1, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="📝 Description", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=2, column=0, sticky='nw', padx=8, pady=8)
+        self.document_description_text = tk.Text(form, height=4, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd', wrap='word')
+        self.document_description_text.grid(row=2, column=1, padx=8, pady=8, sticky='ew')
+
+        tk.Label(form, text="📂 File Path", bg='white', fg=COLORS['primary'], font=('Segoe UI', 11, 'bold')).grid(row=3, column=0, sticky='w', padx=8, pady=8)
+        path_frame = tk.Frame(form, bg='white')
+        path_frame.grid(row=3, column=1, padx=8, pady=8, sticky='ew')
+        self.document_path_var = tk.StringVar()
+        self.document_path_entry = tk.Entry(path_frame, textvariable=self.document_path_var, font=('Segoe UI', 11), relief='solid', bd=1, bg='#f8fbfd')
+        self.document_path_entry.pack(side='left', fill='x', expand=True)
+        tk.Button(path_frame, text='Browse', command=self.browse_document_file, bg=COLORS['secondary'], fg='white', bd=0, padx=12, pady=6, cursor='hand2').pack(side='left', padx=(8, 0))
+
+        button_frame = tk.Frame(form_card, bg='white')
+        button_frame.pack(fill='x', padx=18, pady=(0, 18))
+        ModernButton(button_frame, text="💾 Save Document", command=self.save_document_metadata, color='secondary').pack(side='left', padx=6)
+        ModernButton(button_frame, text="🔄 Refresh", command=self.load_documents_data, color='info').pack(side='left', padx=6)
+
+        list_card = tk.Frame(right_frame, bg='#eef6fb', relief='flat', bd=1)
+        list_card.pack(fill='both', expand=True, padx=10, pady=10)
+        top = tk.Frame(list_card, bg='#eef6fb')
+        top.pack(fill='x', padx=16, pady=(16, 10))
+        tk.Label(top, text="DOCUMENT REGISTER", font=('Segoe UI', 16, 'bold'), bg='#eef6fb', fg=COLORS['primary']).pack(side='left')
+        tk.Button(top, text='Open Selected File', command=self.open_selected_document, bg=COLORS['info'], fg='white', bd=0, padx=10, pady=6, cursor='hand2').pack(side='left', padx=8)
+
+        self.document_tree = ttk.Treeview(list_card, columns=('id', 'patient', 'type', 'filename', 'path', 'uploaded', 'description'), show='headings', height=16)
+        self.document_tree.heading('id', text='ID')
+        self.document_tree.heading('patient', text='Patient')
+        self.document_tree.heading('type', text='Type')
+        self.document_tree.heading('filename', text='Filename')
+        self.document_tree.heading('path', text='File Path')
+        self.document_tree.heading('uploaded', text='Uploaded')
+        self.document_tree.heading('description', text='Description')
+        self.document_tree.column('id', width=40, anchor='center')
+        self.document_tree.column('patient', width=110)
+        self.document_tree.column('type', width=110)
+        self.document_tree.column('filename', width=140)
+        self.document_tree.column('path', width=170)
+        self.document_tree.column('uploaded', width=110, anchor='center')
+        self.document_tree.column('description', width=180)
+        self.document_tree.pack(fill='both', expand=True, padx=16, pady=(0, 16))
+
+        self.update_document_patient_dropdown()
+        self.load_documents_data()
+
+    def browse_document_file(self):
+        path = filedialog.askopenfilename(title='Select Document File', filetypes=[('All Files', '*.*')])
+        if path:
+            self.document_path_var.set(path)
+            self.document_type_entry.delete(0, tk.END)
+            self.document_type_entry.insert(0, os.path.splitext(path)[1].lstrip('.').upper() or 'Other')
+
+    def save_document_metadata(self):
+        patient_value = self.document_patient_var.get().strip()
+        patient_id = patient_value.split(' - ', 1)[0].upper() if ' - ' in patient_value else patient_value.upper()
+        document_type = self.document_type_entry.get().strip() or 'General'
+        file_path = self.document_path_var.get().strip()
+        description = self.document_description_text.get('1.0', tk.END).strip()
+
+        if not patient_id or not file_path:
+            SilentMessageBox.show_error('Document Error', 'Please select a patient and attach a file.', self.root)
+            return
+
+        filename = os.path.basename(file_path)
+        if self.db.save_document(patient_id, document_type, filename, file_path, description):
+            self.load_documents_data()
+            SilentMessageBox.show_info('Document Saved', 'Document metadata saved successfully.', self.root)
+            self.update_status(f'Document saved for {patient_id}')
+        else:
+            SilentMessageBox.show_error('Save Failed', 'Unable to save document metadata.', self.root)
+
+    def open_selected_document(self):
+        selection = self.document_tree.selection()
+        if not selection:
+            SilentMessageBox.show_error('No Selection', 'Select a document record to open its file.', self.root)
+            return
+        item = self.document_tree.item(selection[0])
+        path = item['values'][4]
+        if path and os.path.exists(path):
+            try:
+                os.startfile(path)
+            except Exception:
+                SilentMessageBox.show_error('Open Error', 'Unable to open the file path directly.', self.root)
+        else:
+            SilentMessageBox.show_error('Missing File', 'The stored file path does not exist on disk.', self.root)
+
+    def update_document_patient_dropdown(self, patients=None):
+        self.document_patient_combo['values'] = self.get_patient_dropdown_values(patients)
+
+    def load_documents_data(self):
+        docs = self.db.get_documents()
+        self.document_tree.delete(*self.document_tree.get_children())
+        for doc in docs:
+            self.document_tree.insert('', tk.END, values=(doc['id'], doc['patient_id'], doc['document_type'], doc['filename'], doc['file_path'], doc['uploaded_date'], doc['description']))
+
+    def on_admission_select(self, event=None):
+        selection = self.admission_listbox.curselection()
+        if selection:
+            selected = self.admission_listbox.get(selection[0])
+            self.update_status(f"Selected admission: {selected}")
+
     def create_patient_list_tab(self):
         """Patient directory tab"""
         self.patient_list_tab = tk.Frame(self.notebook, bg=COLORS['light_bg'])
@@ -2295,6 +2968,7 @@ class HospitalApp:
         startup_options = [
             'Patient Registration', 'Edit Patients', 'Patient Directory', 'Doctors',
             'Triage Queue', 'Appointments', 'Treatment History', 'Billing',
+            'Hospital Operations', 'Lab Orders', 'Pharmacy Inventory', 'Insurance Claims', 'Patient Documents',
             'Department Routing', 'Search Patient', 'Settings'
         ]
         self.startup_choice = ttk.Combobox(form_frame, textvariable=self.startup_tab_var, values=startup_options, state='readonly')

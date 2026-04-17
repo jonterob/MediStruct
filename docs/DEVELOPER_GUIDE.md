@@ -52,6 +52,7 @@
 - `main.py` loads saved settings on startup using `load_system_settings()` and applies them through `set_theme()` and `apply_font_size()`.
 - `apply_theme_to_widget()` recursively updates widget colors for the selected theme.
 - Patient and doctor selection fields use helper methods such as `resolve_patient_id()` and `get_patient_dropdown_values()`.
+- `HospitalDatabase` now includes schema migration and backward-compatibility handling for legacy `patients` table rows, preventing blank patient selections when optional patient columns are missing.
 
 ### Add a new data structure module
 1. Create a dedicated module file.

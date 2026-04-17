@@ -113,6 +113,11 @@ flowchart TD
 - Adjustable UI font size for improved accessibility
 - Theme and preference values are saved in `system_settings`
 
+### Hospital Operations
+- Ward, bed, and admission management for larger medical facilities
+- Support for operational hospital workflows such as bed occupancy and patient placement
+- Document metadata, lab order, medication inventory, and insurance claim support in the database
+
 ### Department Routing
 - Shortest path calculation between departments
 - Weighted graph representation of movement routes
@@ -126,6 +131,14 @@ Core tables:
 - `treatments`
 - `doctors`
 - `bills`
+- `hospitals`
+- `wards`
+- `beds`
+- `admissions`
+- `lab_orders`
+- `medication_inventory`
+- `insurance_claims`
+- `documents`
 - `users`
 - `system_settings`
 - `audit_log`

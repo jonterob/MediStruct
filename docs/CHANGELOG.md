@@ -23,4 +23,4 @@ All notable changes to this project should be documented in this file.
 - Added startup tab selection, auto backup on exit, and font size accessibility controls in system settings.
 
 ### Fixed
-- N/A
+- Fixed patient loading failure caused by legacy `patients` schema mismatch, preventing blank selection in patient dropdowns.

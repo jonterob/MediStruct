@@ -33,11 +33,13 @@ Checks:
 
 Symptoms:
 - UI and DB appear out of sync.
+- Patient dropdowns show blank or fail to populate.
 
 Checks:
 1. Use normal app close to trigger sync.
 2. Avoid force-killing process during write operations.
 3. Compare memory-backed views and DB table rows.
+4. If patient selection is blank, the app may be loading from a legacy `patients` schema. Restart the app and check logs for schema migration messages in `database.py`.
 
 ## Appointment Slot Conflicts
 

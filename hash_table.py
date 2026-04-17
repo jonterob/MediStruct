@@ -1,12 +1,36 @@
 # Hash Table for Patient Records
 class PatientRecord:
-    def __init__(self, patient_id, name, age, contact, blood_group, allergies):
+    def __init__(
+        self,
+        patient_id,
+        name,
+        age,
+        contact,
+        blood_group,
+        allergies,
+        medical_record_number=None,
+        insurance_provider=None,
+        policy_number=None,
+        emergency_contact=None,
+        primary_physician=None,
+        next_of_kin=None,
+        address=None,
+        hospital_id=None,
+    ):
         self.patient_id = patient_id
         self._name = name
         self._age = age
         self._contact = contact
         self._blood_group = blood_group
         self._allergies = allergies
+        self.medical_record_number = medical_record_number
+        self.insurance_provider = insurance_provider
+        self.policy_number = policy_number
+        self.emergency_contact = emergency_contact
+        self.primary_physician = primary_physician
+        self.next_of_kin = next_of_kin
+        self.address = address
+        self.hospital_id = hospital_id
         self.dirty = True  # New records are dirty by default until saved
         self.treatment_history = []
 
@@ -55,7 +79,8 @@ class PatientRecord:
             self.dirty = True
     
     def __str__(self):
-        return f"ID: {self.patient_id} | Name: {self.name} | Age: {self.age} | Blood: {self.blood_group}"
+        mrn = f" | MRN: {self.medical_record_number}" if self.medical_record_number else ""
+        return f"ID: {self.patient_id} | Name: {self.name} | Age: {self.age} | Blood: {self.blood_group}{mrn}"
 
 class HashTable:
     def __init__(self, size=100):
